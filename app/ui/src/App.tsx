@@ -1,0 +1,411 @@
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  createJob,
+  fetchFiles,
+  fetchJobLogs,
+  fetchJobs,
+  fetchProviders,
+  saveTokens,
+  subscribeProgress
+} from "./api";
+import { FileItem, JobModel, ProvidersResponse } from "./types";
+
+interface FormState {
+  url: string;
+  provider: string;
+  store: string;
+  quality: string;
+  pathTemplate: string;
+}
+
+const STATUS_STYLE: Record<string, { label: string; color: string }> = {
+  pending: { label: "В очереди", color: "#fbbf24" },
+  running: { label: "В работе", color: "#38bdf8" },
+  completed: { label: "Готово", color: "#34d399" },
+  failed: { label: "Ошибка", color: "#f87171" },
+  cancelled: { label: "Отменено", color: "#cbd5f5" }
+};
+
+function formatDate(date: string | null): string {
+  if (!date) {
+    return "—";
+  }
+  return new Date(date).toLocaleString("ru-RU");
+}
+
+function humanSize(size: number): string {
+  if (size < 1024) {
+    return `${size} Б`;
+  }
+  const units = ["КБ", "МБ", "ГБ", "ТБ"];
+  let value = size;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(1)} ${units[index]}`;
+}
+
+function sortJobs(jobs: JobModel[]): JobModel[] {
+  return [...jobs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+const DEFAULT_FORM: FormState = {
+  url: "",
+  provider: "spotify",
+  store: "",
+  quality: "",
+  pathTemplate: ""
+};
+
+const App: React.FC = () => {
+  const [providers, setProviders] = useState<ProvidersResponse | null>(null);
+  const [jobs, setJobs] = useState<JobModel[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [tokenProvider, setTokenProvider] = useState<string>("");
+  const [tokenData, setTokenData] = useState<string>("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
+  const [jobLogs, setJobLogs] = useState<string[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const updateJobList = useCallback((current: JobModel[], incoming: JobModel): JobModel[] => {
+    const index = current.findIndex((item) => item.id === incoming.id);
+    if (index >= 0) {
+      const updated = [...current];
+      updated[index] = incoming;
+      return updated;
+    }
+    return [...current, incoming];
+  }, []);
+
+  const refreshFiles = useCallback(async () => {
+    try {
+      const response = await fetchFiles();
+      setFiles(response.files);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const refreshJobs = useCallback(async () => {
+    try {
+      const response = await fetchJobs();
+      setJobs(sortJobs(response.jobs));
+    } catch (err) {
+      console.error(err);
+      setError((err as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [prov, jobsResponse, filesResponse] = await Promise.all([
+          fetchProviders(),
+          fetchJobs(),
+          fetchFiles()
+        ]);
+        setProviders(prov);
+        setJobs(sortJobs(jobsResponse.jobs));
+        setFiles(filesResponse.files);
+        setForm((prev) => ({ ...prev, store: prov.stores[0] ?? prev.store }));
+        setTokenProvider(prov.stores[0] ?? "");
+      } catch (err) {
+        console.error(err);
+        setError((err as Error).message);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeProgress((job) => {
+      setJobs((prev) => sortJobs(updateJobList(prev, job)));
+      let shouldSyncLogs = false;
+      setSelectedJob((prev) => {
+        if (prev && prev.id === job.id) {
+          shouldSyncLogs = true;
+          return job;
+        }
+        return prev;
+      });
+      if (shouldSyncLogs) {
+        setJobLogs(job.logs);
+      }
+      if (job.status === "completed") {
+        refreshFiles();
+      }
+    });
+    return unsubscribe;
+  }, [refreshFiles, updateJobList]);
+
+
+  const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateJob = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!form.url) {
+      setError("Укажите ссылку на источник Spotify");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await createJob({
+        provider: form.provider,
+        store: form.store,
+        url: form.url,
+        quality: form.quality || null,
+        path_template: form.pathTemplate || null
+      });
+      setJobs((prev) => sortJobs(updateJobList(prev, response.job)));
+      setMessage("Задача создана");
+      setForm((prev) => ({ ...prev, url: "" }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveTokens = async () => {
+    if (!tokenProvider) {
+      setError("Выберите провайдера");
+      return;
+    }
+    try {
+      const payload = tokenData ? JSON.parse(tokenData) : {};
+      await saveTokens(tokenProvider, payload);
+      setMessage("Токены сохранены");
+      setError(null);
+    } catch (err) {
+      setError(`Не удалось сохранить токены: ${(err as Error).message}`);
+    }
+  };
+
+  const handleSelectJob = async (job: JobModel) => {
+    setSelectedJob(job);
+    setJobLogs(job.logs);
+    setLogsLoading(true);
+    try {
+      const logs = await fetchJobLogs(job.id);
+      setJobLogs(logs);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const statusLabel = (status: string) => STATUS_STYLE[status]?.label ?? status;
+  const statusColor = (status: string) => STATUS_STYLE[status]?.color ?? "#cbd5f5";
+
+  return (
+    <main>
+      <header>
+        <h1>SpotiFLAC Control Center</h1>
+        <p style={{ color: "#94a3b8" }}>Очередь загрузок, токены и файлы в одном месте.</p>
+      </header>
+
+      {message && (
+        <div className="alert">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="alert error">
+          {error}
+        </div>
+      )}
+
+      <section>
+        <header>
+          <h2>Новая задача</h2>
+          <span style={{ color: "#64748b" }}>Создайте загрузку из Spotify-ссылки</span>
+        </header>
+        <form onSubmit={handleCreateJob}>
+          <div className="form-grid">
+            <div>
+              <label htmlFor="url">Spotify URL</label>
+              <input
+                id="url"
+                placeholder="https://open.spotify.com/..."
+                value={form.url}
+                onChange={handleChange("url")}
+              />
+            </div>
+            <div>
+              <label htmlFor="store">Магазин загрузки</label>
+              <select id="store" value={form.store} onChange={handleChange("store")}>
+                {(providers?.stores ?? []).map((storeOption) => (
+                  <option key={storeOption} value={storeOption}>
+                    {storeOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="quality">Качество</label>
+              <input
+                id="quality"
+                placeholder="LOSSLESS / 24-bit / ..."
+                value={form.quality}
+                onChange={handleChange("quality")}
+              />
+            </div>
+            <div>
+              <label htmlFor="template">Шаблон пути</label>
+              <input
+                id="template"
+                placeholder="{artist}/{album}/{track:02d} - {title}.{ext}"
+                value={form.pathTemplate}
+                onChange={handleChange("pathTemplate")}
+              />
+            </div>
+          </div>
+          <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+            <button type="submit" disabled={busy}>
+              {busy ? "Создание..." : "Создать задачу"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section>
+        <header>
+          <h2>Токены провайдеров</h2>
+          <span style={{ color: "#64748b" }}>Вставьте JSON-токены или куки</span>
+        </header>
+        <div className="form-grid">
+          <div>
+            <label htmlFor="token-provider">Провайдер</label>
+            <select
+              id="token-provider"
+              value={tokenProvider}
+              onChange={(event) => setTokenProvider(event.target.value)}
+            >
+              {(providers?.stores ?? []).map((storeOption) => (
+                <option key={storeOption} value={storeOption}>
+                  {storeOption}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label htmlFor="token-data">JSON токенов</label>
+            <textarea
+              id="token-data"
+              rows={4}
+              placeholder="{\n  \"token\": \"...\"\n}"
+              value={tokenData}
+              onChange={(event) => setTokenData(event.target.value)}
+            />
+          </div>
+        </div>
+        <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+          <button type="button" onClick={handleSaveTokens}>
+            Сохранить токены
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <header>
+          <h2>Очередь</h2>
+          <button type="button" onClick={refreshJobs} style={{ background: "transparent", color: "#38bdf8" }}>
+            Обновить
+          </button>
+        </header>
+        <div style={{ overflowX: "auto" }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Статус</th>
+                <th>Прогресс</th>
+                <th>Треки</th>
+                <th>Магазин</th>
+                <th>Создана</th>
+                <th>Сообщение</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map((job) => (
+                <tr key={job.id} onClick={() => handleSelectJob(job)}>
+                  <td style={{ fontFamily: "JetBrains Mono, monospace" }}>{job.id.slice(0, 8)}</td>
+                  <td>
+                    <span className="status-badge" style={{ background: `${statusColor(job.status)}33`, color: statusColor(job.status) }}>
+                      {statusLabel(job.status)}
+                    </span>
+                  </td>
+                  <td style={{ width: "160px" }}>
+                    <div className="progress-bar">
+                      <span style={{ width: `${Math.round(job.progress * 100)}%` }} />
+                    </div>
+                  </td>
+                  <td>
+                    {job.completed_tracks}/{job.total_tracks}
+                  </td>
+                  <td>{job.store}</td>
+                  <td>{formatDate(job.created_at)}</td>
+                  <td>{job.message ?? job.error ?? ""}</td>
+                </tr>
+              ))}
+              {jobs.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "1.5rem", color: "#64748b" }}>
+                    Пока нет задач
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {selectedJob && (
+        <section>
+          <header>
+            <h2>Логи задачи {selectedJob.id.slice(0, 8)}</h2>
+            <span style={{ color: statusColor(selectedJob.status) }}>{statusLabel(selectedJob.status)}</span>
+          </header>
+          <div className="logs-box">
+            {logsLoading && <p>Загрузка логов...</p>}
+            {!logsLoading && jobLogs.length === 0 && <p>Логи отсутствуют.</p>}
+            {!logsLoading &&
+              jobLogs.map((line, index) => (
+                <p key={`${line}-${index}`}>{line}</p>
+              ))}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <header>
+          <h2>Недавние файлы</h2>
+          <span style={{ color: "#64748b" }}>Последние загрузки из каталога /downloads</span>
+        </header>
+        <div className="files-list">
+          {files.map((file) => (
+            <div className="file-card" key={file.path}>
+              <strong>{file.path}</strong>
+              <div style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "0.35rem" }}>
+                {humanSize(file.size)} • {formatDate(file.modified_at)}
+              </div>
+            </div>
+          ))}
+          {files.length === 0 && <p style={{ color: "#64748b" }}>Файлы ещё не загружены.</p>}
+        </div>
+      </section>
+    </main>
+  );
+};
+
+export default App;

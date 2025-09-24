@@ -1,0 +1,298 @@
+"""Основной сервис управления заданиями и очередью загрузок."""
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+import shutil
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from .exceptions import JobCancelled, ProviderError
+from .interfaces import PlaylistProvider, StoreProvider
+from .models import (
+    DownloadJob,
+    JobSnapshot,
+    JobStatus,
+    ProviderType,
+    ResolvedSource,
+    StoreType,
+    TrackMetadata,
+)
+from .utils import clamp_progress
+from app.infra.storage import StorageManager
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class JobRequest:
+    """Параметры создания новой задачи."""
+
+    provider: ProviderType
+    store: StoreType
+    url: str
+    quality: Optional[str]
+    path_template: str
+
+
+class JobState:
+    """Внутреннее состояние задачи."""
+
+    def __init__(self, job: DownloadJob) -> None:
+        self.job = job
+        self.subscribers: List[asyncio.Queue] = []
+        self.cancel_requested = False
+
+    def snapshot(self) -> JobSnapshot:
+        return self.job.snapshot()
+
+    def notify(self) -> None:
+        snapshot = self.snapshot()
+        for queue in list(self.subscribers):
+            try:
+                queue.put_nowait(snapshot)
+            except asyncio.QueueFull:
+                logger.warning("Очередь подписчика переполнена, удаляем", exc_info=False)
+                self.subscribers.remove(queue)
+
+
+class DownloadService:
+    """Оркестратор загрузок."""
+
+    def __init__(
+        self,
+        playlist_provider: PlaylistProvider,
+        store_providers: Dict[StoreType, StoreProvider],
+        storage: StorageManager,
+        *,
+        worker_concurrency: int = 1,
+    ) -> None:
+        self.playlist_provider = playlist_provider
+        self.store_providers = store_providers
+        self.storage = storage
+        self.worker_concurrency = max(1, worker_concurrency)
+
+        self._jobs: Dict[str, JobState] = {}
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._global_subscribers: List[asyncio.Queue] = []
+        self._workers: List[asyncio.Task] = []
+        self._started = False
+
+    async def start(self) -> None:
+        if self._started:
+            return
+        self.storage.ensure_directories()
+        self._workers = [asyncio.create_task(self._worker(), name=f"job-worker-{i}") for i in range(self.worker_concurrency)]
+        self._started = True
+        logger.info("Очередь загрузок запущена", extra={"workers": self.worker_concurrency})
+
+    @property
+    def started(self) -> bool:
+        return self._started
+
+    async def stop(self) -> None:
+        if not self._started:
+            return
+        for worker in self._workers:
+            worker.cancel()
+        for worker in self._workers:
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
+        self._workers.clear()
+        self._started = False
+        logger.info("Очередь загрузок остановлена")
+
+    async def submit_job(self, request: JobRequest) -> JobSnapshot:
+        if not self._started:
+            raise RuntimeError("Сервис не запущен")
+
+        job_id = uuid.uuid4().hex
+        job = DownloadJob(
+            id=job_id,
+            provider=request.provider,
+            store=request.store,
+            source_url=request.url,
+            quality=request.quality,
+            path_template=request.path_template,
+            output_dir=str(self.storage.download_dir),
+        )
+        state = JobState(job)
+        self._jobs[job_id] = state
+        state.notify()
+        self._broadcast(state)
+        await self._queue.put(job_id)
+        logger.info("Добавлена задача", extra={"job_id": job_id, "store": job.store.value})
+        return state.snapshot()
+
+    def get_job(self, job_id: str) -> Optional[JobSnapshot]:
+        state = self._jobs.get(job_id)
+        return state.snapshot() if state else None
+
+    def list_jobs(self) -> List[JobSnapshot]:
+        return [state.snapshot() for state in self._jobs.values()]
+
+    def subscribe_job(self, job_id: str) -> asyncio.Queue:
+        state = self._jobs.get(job_id)
+        if not state:
+            raise KeyError(job_id)
+        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+        state.subscribers.append(queue)
+        queue.put_nowait(state.snapshot())
+        return queue
+
+    def unsubscribe_job(self, job_id: str, queue: asyncio.Queue) -> None:
+        state = self._jobs.get(job_id)
+        if not state:
+            return
+        with contextlib.suppress(ValueError):
+            state.subscribers.remove(queue)
+
+    def subscribe_global(self) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=200)
+        self._global_subscribers.append(queue)
+        for state in self._jobs.values():
+            queue.put_nowait(state.snapshot())
+        return queue
+
+    def unsubscribe_global(self, queue: asyncio.Queue) -> None:
+        with contextlib.suppress(ValueError):
+            self._global_subscribers.remove(queue)
+
+    def cancel_job(self, job_id: str) -> bool:
+        state = self._jobs.get(job_id)
+        if not state:
+            return False
+        state.cancel_requested = True
+        state.job.logs.append("Отмена запрошена пользователем")
+        state.job.touch()
+        state.notify()
+        self._broadcast(state)
+        logger.info("Отмена задачи", extra={"job_id": job_id})
+        return True
+
+    async def _worker(self) -> None:
+        while True:
+            job_id = await self._queue.get()
+            try:
+                state = self._jobs.get(job_id)
+                if not state:
+                    continue
+                job = state.job
+                if job.status not in {JobStatus.PENDING, JobStatus.FAILED}:
+                    continue
+
+                job.status = JobStatus.RUNNING
+                job.touch()
+                state.notify()
+                self._broadcast(state)
+
+                try:
+                    await self._execute_job(state)
+                except JobCancelled:
+                    job.status = JobStatus.CANCELLED
+                    job.message = "Задача отменена"
+                    job.finished_at = datetime.utcnow()
+                    job.touch()
+                    logger.info("Задача отменена", extra={"job_id": job.id})
+                except Exception as exc:  # noqa: BLE001
+                    job.status = JobStatus.FAILED
+                    job.error = str(exc)
+                    job.finished_at = datetime.utcnow()
+                    job.touch()
+                    logger.exception("Ошибка выполнения задачи", exc_info=exc, extra={"job_id": job.id})
+                else:
+                    job.status = JobStatus.COMPLETED
+                    job.finished_at = datetime.utcnow()
+                    job.touch()
+                    logger.info("Задача завершена", extra={"job_id": job.id})
+
+                state.notify()
+                self._broadcast(state)
+            finally:
+                self._queue.task_done()
+
+    async def _execute_job(self, state: JobState) -> None:
+        job = state.job
+        store = self.store_providers.get(job.store)
+        if not store:
+            raise ProviderError(f"Провайдер {job.store.value} недоступен")
+
+        resolved = await self.playlist_provider.resolve(job.source_url)
+        tracks = resolved.tracks
+        if not tracks:
+            raise ProviderError("Список треков пуст")
+
+        job.total_tracks = len(tracks)
+        job.message = resolved.name or resolved.source_type
+        job.output_dir = str(self.storage.download_dir)
+        job.touch()
+        state.notify()
+        self._broadcast(state)
+
+        for track in tracks:
+            if state.cancel_requested:
+                raise JobCancelled()
+            if not track.isrc:
+                job.failed_tracks += 1
+                job.logs.append(f"Пропущен {track.title} — отсутствует ISRC")
+                job.touch()
+                state.notify()
+                self._broadcast(state)
+                continue
+
+            final_path = self.storage.build_track_path(job, track)
+            final_path.parent.mkdir(parents=True, exist_ok=True)
+            if final_path.exists():
+                job.completed_tracks += 1
+                job.logs.append(f"Пропуск: {final_path.name} уже существует")
+                job.progress = clamp_progress(job.completed_tracks, job.total_tracks)
+                job.touch()
+                state.notify()
+                self._broadcast(state)
+                continue
+
+            try:
+                downloaded = await store.download_track(
+                    track,
+                    final_path.parent,
+                    quality=job.quality,
+                    is_cancelled=lambda: state.cancel_requested,
+                )
+                downloaded_path = Path(downloaded)
+                if downloaded_path != final_path:
+                    shutil.move(downloaded_path, final_path)
+                job.completed_tracks += 1
+                job.logs.append(f"Сохранено: {final_path.relative_to(self.storage.download_dir)}")
+            except JobCancelled:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                job.failed_tracks += 1
+                job.logs.append(f"Ошибка: {track.title} — {exc}")
+                logger.exception("Ошибка загрузки трека", exc_info=exc, extra={"job_id": job.id})
+            finally:
+                job.progress = clamp_progress(job.completed_tracks, job.total_tracks)
+                job.touch()
+                state.notify()
+                self._broadcast(state)
+
+    def _broadcast(self, state: JobState) -> None:
+        snapshot = state.snapshot()
+        for queue in list(self._global_subscribers):
+            try:
+                queue.put_nowait(snapshot)
+            except asyncio.QueueFull:
+                logger.warning("Глобальная очередь переполнена, удаляем подписчика", exc_info=False)
+                self._global_subscribers.remove(queue)
+
+    def get_files(self) -> List[Dict[str, object]]:
+        return [entry.to_dict() for entry in self.storage.list_downloads()]
+
+    def get_providers(self) -> Dict[str, object]:
+        return {
+            "playlists": [job_provider.value for job_provider in ProviderType],
+            "stores": [store.value for store in self.store_providers.keys()],
+        }
