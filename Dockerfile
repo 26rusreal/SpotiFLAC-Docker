@@ -11,9 +11,9 @@ RUN apt-get update \
        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /
 COPY app/ /app
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 ENV DOWNLOAD_DIR=/downloads \
     CONFIG_DIR=/config

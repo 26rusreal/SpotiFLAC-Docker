@@ -11,13 +11,13 @@ services:
       - ./data/downloads:/downloads
       - ./data/config:/config
     ports:
-      - "8080:8080"
+      - "8082:8080"
 
   ui:
     build: ./app/ui
     environment:
       - VITE_API_BASE=/api
     ports:
-      - "8081:80"
+      - "8083:80"
     depends_on:
       - api
