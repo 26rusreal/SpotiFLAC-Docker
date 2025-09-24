@@ -5,7 +5,6 @@ import {
   fetchJobLogs,
   fetchJobs,
   fetchProviders,
-  saveTokens,
   subscribeProgress
 } from "./api";
 import { FileItem, JobModel, ProvidersResponse } from "./types";
@@ -64,8 +63,6 @@ const App: React.FC = () => {
   const [jobs, setJobs] = useState<JobModel[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
-  const [tokenProvider, setTokenProvider] = useState<string>("");
-  const [tokenData, setTokenData] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -114,7 +111,6 @@ const App: React.FC = () => {
         setJobs(sortJobs(jobsResponse.jobs));
         setFiles(filesResponse.files);
         setForm((prev) => ({ ...prev, store: prov.stores[0] ?? prev.store }));
-        setTokenProvider(prov.stores[0] ?? "");
       } catch (err) {
         console.error(err);
         setError((err as Error).message);
@@ -175,20 +171,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveTokens = async () => {
-    if (!tokenProvider) {
-      setError("Выберите провайдера");
-      return;
-    }
-    try {
-      const payload = tokenData ? JSON.parse(tokenData) : {};
-      await saveTokens(tokenProvider, payload);
-      setMessage("Токены сохранены");
-      setError(null);
-    } catch (err) {
-      setError(`Не удалось сохранить токены: ${(err as Error).message}`);
-    }
-  };
 
   const handleSelectJob = async (job: JobModel) => {
     setSelectedJob(job);
@@ -278,43 +260,6 @@ const App: React.FC = () => {
         </form>
       </section>
 
-      <section>
-        <header>
-          <h2>Токены провайдеров</h2>
-          <span style={{ color: "#64748b" }}>Вставьте JSON-токены или куки</span>
-        </header>
-        <div className="form-grid">
-          <div>
-            <label htmlFor="token-provider">Провайдер</label>
-            <select
-              id="token-provider"
-              value={tokenProvider}
-              onChange={(event) => setTokenProvider(event.target.value)}
-            >
-              {(providers?.stores ?? []).map((storeOption) => (
-                <option key={storeOption} value={storeOption}>
-                  {storeOption}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="token-data">JSON токенов</label>
-            <textarea
-              id="token-data"
-              rows={4}
-              placeholder="{\n  \"token\": \"...\"\n}"
-              value={tokenData}
-              onChange={(event) => setTokenData(event.target.value)}
-            />
-          </div>
-        </div>
-        <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
-          <button type="button" onClick={handleSaveTokens}>
-            Сохранить токены
-          </button>
-        </div>
-      </section>
 
       <section>
         <header>
