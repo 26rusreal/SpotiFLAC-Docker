@@ -1,5 +1,4 @@
 import requests
-import asyncio
 import os
 import sys
 from mutagen.flac import FLAC
@@ -129,13 +128,14 @@ class DeezerDownloader:
         except Exception as e:
             print(f"Error embedding metadata: {e}")
     
-    async def download_by_isrc(self, isrc, output_dir="."):
+    def download_by_isrc(self, isrc, output_dir="."):
+
         print(f"Fetching track info for ISRC: {isrc}")
         
         track_data = self.get_track_by_isrc(isrc)
         if not track_data:
             print("Failed to get track data from Deezer API")
-            return False
+            return None
         
         metadata = self.extract_metadata(track_data)
         print(f"Found track: {metadata.get('artists', 'Unknown')} - {metadata.get('title', 'Unknown')}")
@@ -143,7 +143,7 @@ class DeezerDownloader:
         track_id = track_data.get('id')
         if not track_id:
             print("No track ID found in Deezer API response")
-            return False
+            return None
         
         print(f"Using track ID: {track_id}")
         
@@ -157,20 +157,20 @@ class DeezerDownloader:
             
             if not api_data.get('success'):
                 print("API request failed")
-                return False
+                return None
             
             links = api_data.get('links', {})
             flac_url = links.get('flac')
             
             if not flac_url:
                 print("No FLAC download link found in API response")
-                return False
+                return None
             
             print(f"Successfully obtained FLAC download URL")
             
         except Exception as e:
             print(f"Error getting download URL from API: {e}")
-            return False
+            return None
         
         print("Downloading FLAC file...")
         try:
@@ -206,20 +206,23 @@ class DeezerDownloader:
                 os.remove(cover_path)
             
             print(f"Successfully downloaded and tagged: {filename}")
-            return True
+            return file_path
             
         except Exception as e:
             print(f"Error downloading file: {e}")
-            return False
+            return None
 
-async def main():
+    def download_by_isrc_sync(self, isrc, output_dir="."):
+        return self.download_by_isrc(isrc, output_dir)
+
+def main():
     print("=== DeezerDL - Deezer Downloader ===")
     downloader = DeezerDownloader()
     
     isrc = "USAT22409172"
     output_dir = "."
     
-    success = await downloader.download_by_isrc(isrc, output_dir)
+    success = downloader.download_by_isrc(isrc, output_dir)
     if success:
         print("Download completed successfully!")
     else:
@@ -238,4 +241,4 @@ if __name__ == "__main__":
     except:
         pass
         
-    asyncio.run(main())
+    main()

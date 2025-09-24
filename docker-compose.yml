@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    environment:
+      - DOWNLOAD_DIR=/downloads
+      - CONFIG_DIR=/config
+      - TZ=UTC
+    volumes:
+      - ./data/downloads:/downloads
+      - ./data/config:/config
+    ports:
+      - "8080:8080"
+
+  ui:
+    build: ./app/ui
+    environment:
+      - VITE_API_BASE=/api
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
