@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.core.models import ProviderType, StoreType
 
@@ -62,3 +62,29 @@ class FileItem(BaseModel):
 
 class FilesResponse(BaseModel):
     files: List[FileItem]
+
+
+class ProxySettingsModel(BaseModel):
+    enabled: bool = Field(False, description="Активировать SOCKS5-прокси")
+    host: str = Field("", description="Адрес прокси-сервера")
+    port: Optional[int] = Field(None, description="Порт прокси", ge=1, le=65535)
+    username: str = Field("", description="Имя пользователя для авторизации")
+    password: str = Field("", description="Пароль для авторизации")
+
+    @model_validator(mode="after")
+    def validate_proxy(self) -> "ProxySettingsModel":
+        """Проверяет наличие адреса и порта при включённом прокси."""
+
+        if self.enabled:
+            if not self.host.strip():
+                raise ValueError("Укажите адрес прокси-сервера")
+            if not self.port:
+                raise ValueError("Укажите порт прокси-сервера")
+        return self
+
+
+class AppSettingsModel(BaseModel):
+    proxy: ProxySettingsModel = Field(
+        default_factory=ProxySettingsModel,
+        description="Настройки доступа к Spotify",
+    )

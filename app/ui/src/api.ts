@@ -1,4 +1,4 @@
-import { FilesResponse, JobModel, JobResponse, JobsListResponse, ProvidersResponse } from "./types";
+import type { AppSettings, FilesResponse, JobModel, JobResponse, JobsListResponse, ProvidersResponse } from "./types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "/api";
 
@@ -51,6 +51,10 @@ export async function fetchFiles(): Promise<FilesResponse> {
   return request<FilesResponse>("/files");
 }
 
+export async function fetchSettings(): Promise<AppSettings> {
+  return request<AppSettings>("/settings");
+}
+
 export async function createJob(body: {
   provider: string;
   store: string;
@@ -74,6 +78,13 @@ export async function saveTokens(provider: string, data: Record<string, unknown>
 export async function fetchJobLogs(jobId: string): Promise<string[]> {
   const response = await request<{ logs: string[] }>(`/jobs/${jobId}/logs`);
   return response.logs;
+}
+
+export async function updateSettings(body: AppSettings): Promise<AppSettings> {
+  return request<AppSettings>("/settings", {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
 }
 
 export function subscribeProgress(onUpdate: (job: JobModel) => void): () => void {

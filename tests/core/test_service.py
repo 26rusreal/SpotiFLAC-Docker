@@ -17,6 +17,7 @@ from app.core.models import (
     TrackMetadata,
 )
 from app.core.service import DownloadService, JobRequest
+from app.infra.app_config import AppConfigRepository, ProxySettings
 from app.infra.storage import StorageManager
 
 
@@ -148,6 +149,7 @@ async def test_успешная_загрузка(настройки: StorageMana
         плейлист,
         {StoreType.QOBUZ: магазин},
         настройки,
+        config_repo=AppConfigRepository(настройки.config_dir),
     )
 
     await сервис.start()
@@ -196,6 +198,7 @@ async def test_отмена_задачи(настройки: StorageManager) -> 
         плейлист,
         {StoreType.QOBUZ: магазин},
         настройки,
+        config_repo=AppConfigRepository(настройки.config_dir),
     )
 
     await сервис.start()
@@ -229,6 +232,7 @@ async def test_ошибка_провайдера_при_пустом_списк�
         плейлист,
         {StoreType.QOBUZ: магазин},
         настройки,
+        config_repo=AppConfigRepository(настройки.config_dir),
     )
 
     await сервис.start()
@@ -248,3 +252,37 @@ async def test_ошибка_провайдера_при_пустом_списк�
         assert финальный.total_tracks == 0
     finally:
         await сервис.stop()
+
+
+def test_настройки_прокси(настройки: StorageManager) -> None:
+    """Проверяет чтение и обновление настроек прокси."""
+
+    репозиторий = AppConfigRepository(настройки.config_dir)
+    сервис = DownloadService(
+        ЗаглушкаПлейлиста([]),
+        {},
+        настройки,
+        config_repo=репозиторий,
+    )
+
+    по_умолчанию = сервис.get_settings()
+    assert по_умолчанию["proxy"]["enabled"] is False
+    assert по_умолчанию["proxy"]["host"] == ""
+
+    обновлённые = сервис.update_settings(
+        ProxySettings(
+            enabled=True,
+            host="127.0.0.1",
+            port=1088,
+            username="user",
+            password="pass",
+        )
+    )
+
+    assert обновлённые["proxy"]["enabled"] is True
+    assert обновлённые["proxy"]["port"] == 1088
+    assert сервис.get_settings() == обновлённые
+    assert репозиторий.build_requests_proxies() == {
+        "http": "socks5h://user:pass@127.0.0.1:1088",
+        "https": "socks5h://user:pass@127.0.0.1:1088",
+    }

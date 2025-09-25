@@ -3,6 +3,18 @@ export interface ProvidersResponse {
   stores: string[];
 }
 
+export interface ProxySettings {
+  enabled: boolean;
+  host: string;
+  port: number | null;
+  username: string;
+  password: string;
+}
+
+export interface AppSettings {
+  proxy: ProxySettings;
+}
+
 export interface JobModel {
   id: string;
   provider: string;

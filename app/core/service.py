@@ -23,6 +23,7 @@ from .models import (
     TrackMetadata,
 )
 from .utils import clamp_progress
+from app.infra.app_config import AppConfigRepository, ProxySettings, get_app_config
 from app.infra.storage import StorageManager
 
 logger = logging.getLogger(__name__)
@@ -68,12 +69,14 @@ class DownloadService:
         playlist_provider: PlaylistProvider,
         store_providers: Dict[StoreType, StoreProvider],
         storage: StorageManager,
+        config_repo: AppConfigRepository | None,
         *,
         worker_concurrency: int = 1,
     ) -> None:
         self.playlist_provider = playlist_provider
         self.store_providers = store_providers
         self.storage = storage
+        self.config_repo = config_repo or get_app_config()
         self.worker_concurrency = max(1, worker_concurrency)
 
         self._jobs: Dict[str, JobState] = {}
@@ -296,3 +299,14 @@ class DownloadService:
             "playlists": [job_provider.value for job_provider in ProviderType],
             "stores": [store.value for store in self.store_providers.keys()],
         }
+
+    def get_settings(self) -> Dict[str, object]:
+        """Возвращает сохранённые настройки приложения."""
+
+        return self.config_repo.load().to_dict()
+
+    def update_settings(self, proxy: ProxySettings) -> Dict[str, object]:
+        """Обновляет параметры прокси и возвращает новые настройки."""
+
+        updated = self.config_repo.update_proxy(proxy)
+        return updated.to_dict()

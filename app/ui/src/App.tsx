@@ -5,9 +5,11 @@ import {
   fetchJobLogs,
   fetchJobs,
   fetchProviders,
-  subscribeProgress
+  fetchSettings,
+  subscribeProgress,
+  updateSettings
 } from "./api";
-import { FileItem, JobModel, ProvidersResponse } from "./types";
+import type { AppSettings, FileItem, JobModel, ProvidersResponse } from "./types";
 
 interface FormState {
   url: string;
@@ -15,6 +17,14 @@ interface FormState {
   store: string;
   quality: string;
   pathTemplate: string;
+}
+
+interface ProxyFormState {
+  enabled: boolean;
+  host: string;
+  port: string;
+  username: string;
+  password: string;
 }
 
 const STATUS_STYLE: Record<string, { label: string; color: string }> = {
@@ -58,14 +68,24 @@ const DEFAULT_FORM: FormState = {
   pathTemplate: ""
 };
 
+const DEFAULT_PROXY_FORM: ProxyFormState = {
+  enabled: false,
+  host: "",
+  port: "",
+  username: "",
+  password: ""
+};
+
 const App: React.FC = () => {
   const [providers, setProviders] = useState<ProvidersResponse | null>(null);
   const [jobs, setJobs] = useState<JobModel[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [proxyForm, setProxyForm] = useState<ProxyFormState>(DEFAULT_PROXY_FORM);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [proxyBusy, setProxyBusy] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
   const [jobLogs, setJobLogs] = useState<string[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -102,15 +122,23 @@ const App: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const [prov, jobsResponse, filesResponse] = await Promise.all([
+        const [prov, jobsResponse, filesResponse, settingsResponse] = await Promise.all([
           fetchProviders(),
           fetchJobs(),
-          fetchFiles()
+          fetchFiles(),
+          fetchSettings()
         ]);
         setProviders(prov);
         setJobs(sortJobs(jobsResponse.jobs));
         setFiles(filesResponse.files);
         setForm((prev) => ({ ...prev, store: prov.stores[0] ?? prev.store }));
+        setProxyForm({
+          enabled: settingsResponse.proxy.enabled,
+          host: settingsResponse.proxy.host,
+          port: settingsResponse.proxy.port ? String(settingsResponse.proxy.port) : "",
+          username: settingsResponse.proxy.username,
+          password: settingsResponse.proxy.password
+        });
       } catch (err) {
         console.error(err);
         setError((err as Error).message);
@@ -143,6 +171,68 @@ const App: React.FC = () => {
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleProxyField = (field: keyof ProxyFormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setProxyForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleProxyToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+    setProxyForm((prev) => ({ ...prev, enabled: checked }));
+  };
+
+  const handleSaveProxy = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage(null);
+    const trimmedHost = proxyForm.host.trim();
+    const trimmedPort = proxyForm.port.trim();
+
+    if (proxyForm.enabled) {
+      if (!trimmedHost) {
+        setError("Укажите адрес прокси");
+        return;
+      }
+      if (!trimmedPort) {
+        setError("Укажите порт прокси");
+        return;
+      }
+    }
+
+    if (trimmedPort && Number.isNaN(Number(trimmedPort))) {
+      setError("Порт должен быть числом");
+      return;
+    }
+
+    const parsedPort = trimmedPort ? Number(trimmedPort) : null;
+
+    setProxyBusy(true);
+    setError(null);
+    try {
+      const payload: AppSettings = {
+        proxy: {
+          enabled: proxyForm.enabled,
+          host: trimmedHost,
+          port: parsedPort,
+          username: proxyForm.username,
+          password: proxyForm.password
+        }
+      };
+      const saved = await updateSettings(payload);
+      setProxyForm({
+        enabled: saved.proxy.enabled,
+        host: saved.proxy.host,
+        port: saved.proxy.port ? String(saved.proxy.port) : "",
+        username: saved.proxy.username,
+        password: saved.proxy.password
+      });
+      setMessage("Настройки сохранены");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setProxyBusy(false);
+    }
   };
 
   const handleCreateJob = async (event: React.FormEvent) => {
@@ -206,6 +296,71 @@ const App: React.FC = () => {
           {error}
         </div>
       )}
+
+      <section>
+        <header>
+          <h2>Сетевые настройки</h2>
+          <span style={{ color: "#64748b" }}>SOCKS5-прокси для запросов к Spotify</span>
+        </header>
+        <form onSubmit={handleSaveProxy}>
+          <div className="checkbox-field">
+            <input
+              id="proxy-enabled"
+              type="checkbox"
+              checked={proxyForm.enabled}
+              onChange={handleProxyToggle}
+            />
+            <label htmlFor="proxy-enabled">Использовать прокси</label>
+          </div>
+          <div className="form-grid">
+            <div>
+              <label htmlFor="proxy-host">Адрес</label>
+              <input
+                id="proxy-host"
+                placeholder="127.0.0.1"
+                value={proxyForm.host}
+                onChange={handleProxyField("host")}
+              />
+            </div>
+            <div>
+              <label htmlFor="proxy-port">Порт</label>
+              <input
+                id="proxy-port"
+                placeholder="1080"
+                value={proxyForm.port}
+                inputMode="numeric"
+                onChange={handleProxyField("port")}
+              />
+            </div>
+            <div>
+              <label htmlFor="proxy-username">Логин</label>
+              <input
+                id="proxy-username"
+                placeholder="Необязательно"
+                value={proxyForm.username}
+                onChange={handleProxyField("username")}
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label htmlFor="proxy-password">Пароль</label>
+              <input
+                id="proxy-password"
+                type="password"
+                placeholder="Необязательно"
+                value={proxyForm.password}
+                onChange={handleProxyField("password")}
+                autoComplete="current-password"
+              />
+            </div>
+          </div>
+          <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+            <button type="submit" disabled={proxyBusy}>
+              {proxyBusy ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <section>
         <header>
