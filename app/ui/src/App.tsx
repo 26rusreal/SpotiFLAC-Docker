@@ -499,75 +499,6 @@ const App: React.FC = () => {
       {error && <div className="alert error">{error}</div>}
 
       <div className="grid grid--two">
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Сетевые настройки</h2>
-              <p className="muted">SOCKS5-прокси для обращения к Spotify</p>
-            </div>
-          </div>
-          <form onSubmit={handleSaveProxy} className="panel-form">
-            <div className="toggle-line">
-              <label className="switch">
-                <input
-                  id="proxy-enabled"
-                  type="checkbox"
-                  checked={proxyForm.enabled}
-                  onChange={handleProxyToggle}
-                />
-                <span>Использовать прокси</span>
-              </label>
-            </div>
-            <div className="form-grid">
-              <div>
-                <label htmlFor="proxy-host">Адрес</label>
-                <input
-                  id="proxy-host"
-                  placeholder="127.0.0.1"
-                  value={proxyForm.host}
-                  onChange={handleProxyField("host")}
-                />
-              </div>
-              <div>
-                <label htmlFor="proxy-port">Порт</label>
-                <input
-                  id="proxy-port"
-                  placeholder="1080"
-                  value={proxyForm.port}
-                  inputMode="numeric"
-                  onChange={handleProxyField("port")}
-                />
-              </div>
-              <div>
-                <label htmlFor="proxy-username">Логин</label>
-                <input
-                  id="proxy-username"
-                  placeholder="Необязательно"
-                  value={proxyForm.username}
-                  onChange={handleProxyField("username")}
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <label htmlFor="proxy-password">Пароль</label>
-                <input
-                  id="proxy-password"
-                  type="password"
-                  placeholder="Необязательно"
-                  value={proxyForm.password}
-                  onChange={handleProxyField("password")}
-                  autoComplete="current-password"
-                />
-              </div>
-            </div>
-            <div className="panel-actions">
-              <button type="submit" disabled={proxyBusy}>
-                {proxyBusy ? "Сохранение..." : "Сохранить"}
-              </button>
-            </div>
-          </form>
-        </section>
-
         <section className="panel panel--highlight">
           <div className="panel-header">
             <div>
@@ -605,9 +536,6 @@ const App: React.FC = () => {
             </button>
           </div>
         </section>
-      </div>
-
-      <div className="grid grid--two">
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -663,7 +591,9 @@ const App: React.FC = () => {
             </div>
           </form>
         </section>
+      </div>
 
+      <div className="grid">
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -822,6 +752,75 @@ const App: React.FC = () => {
                 <p key={`${line}-${index}`}>{line}</p>
               ))}
           </div>
+        </section>
+      </div>
+
+      <div className="grid">
+        <section className="panel panel--compact">
+          <div className="panel-header panel-header--compact">
+            <div>
+              <h2>Сеть и прокси</h2>
+              <p className="muted">Настройки подключения при необходимости</p>
+            </div>
+          </div>
+          <form onSubmit={handleSaveProxy} className="proxy-form">
+            <div className="proxy-row">
+              <label className="switch switch--inline" htmlFor="proxy-enabled">
+                <input
+                  id="proxy-enabled"
+                  type="checkbox"
+                  checked={proxyForm.enabled}
+                  onChange={handleProxyToggle}
+                />
+                <span>Использовать прокси</span>
+              </label>
+              <button type="submit" className="small-button" disabled={proxyBusy}>
+                {proxyBusy ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+            <div className="proxy-grid">
+              <div>
+                <label htmlFor="proxy-host">Адрес</label>
+                <input
+                  id="proxy-host"
+                  placeholder="127.0.0.1"
+                  value={proxyForm.host}
+                  onChange={handleProxyField("host")}
+                />
+              </div>
+              <div>
+                <label htmlFor="proxy-port">Порт</label>
+                <input
+                  id="proxy-port"
+                  placeholder="1080"
+                  value={proxyForm.port}
+                  inputMode="numeric"
+                  onChange={handleProxyField("port")}
+                />
+              </div>
+              <div>
+                <label htmlFor="proxy-username">Логин</label>
+                <input
+                  id="proxy-username"
+                  placeholder="Необязательно"
+                  value={proxyForm.username}
+                  onChange={handleProxyField("username")}
+                  autoComplete="username"
+                />
+              </div>
+              <div>
+                <label htmlFor="proxy-password">Пароль</label>
+                <input
+                  id="proxy-password"
+                  type="password"
+                  placeholder="Необязательно"
+                  value={proxyForm.password}
+                  onChange={handleProxyField("password")}
+                  autoComplete="current-password"
+                />
+              </div>
+            </div>
+          </form>
         </section>
       </div>
     </main>

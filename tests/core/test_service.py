@@ -9,6 +9,7 @@ import pytest
 from app.core.exceptions import JobCancelled
 from app.core.interfaces import PlaylistProvider, StoreProvider
 from app.core.models import (
+    DownloadJob,
     JobSnapshot,
     JobStatus,
     ProviderType,
@@ -175,6 +176,7 @@ async def test_успешная_загрузка(настройки: StorageMana
 
         ожидаемый_путь = (
             настройки.download_dir
+            / "Тестовый плейлист"
             / "Исполнитель"
             / "Альбом"
             / "01 - Композиция.flac"
@@ -334,3 +336,32 @@ async def test_режим_одной_папки_использует_шабло�
         assert снимок.path_template == "{playlist}/{track:02d} - {artist} - {title}.{ext}"
     finally:
         await сервис.stop()
+
+
+def test_плейлист_создаёт_папку_даже_без_шаблона(настройки: StorageManager) -> None:
+    """Убеждаемся, что треки плейлиста попадают в отдельную папку."""
+
+    задание = DownloadJob(
+        id="job-1",
+        provider=ProviderType.SPOTIFY,
+        store=StoreType.QOBUZ,
+        source_url="https://open.spotify.com/playlist/1",
+        quality=None,
+        path_template="{artist}/{album}/{title}.{ext}",
+        mode=DownloadMode.BY_ARTIST,
+        collection_name="My Playlist",
+    )
+    трек = TrackMetadata(
+        title="Track",
+        artists="Artist",
+        album="Album",
+        external_url="https://example.com/track",
+        isrc="ISRC123",
+        track_number=1,
+    )
+
+    путь = настройки.build_track_path(задание, трек)
+
+    относительный = путь.relative_to(настройки.download_dir)
+    assert относительный.parts[0] == "My Playlist"
+    assert относительный.parts[1:] == ("Artist", "Album", "Track.flac")
