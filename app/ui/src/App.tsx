@@ -506,13 +506,16 @@ const App: React.FC = () => {
           </label>
           <label className="field" htmlFor="store">
             <span>Магазин</span>
-            <select id="store" value={form.store} onChange={handleChange("store")}>
-              {(providers?.stores ?? []).map((storeOption) => (
-                <option key={storeOption} value={storeOption}>
-                  {storeOption}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <select id="store" value={form.store} onChange={handleChange("store")}>
+                {(providers?.stores ?? []).map((storeOption) => (
+                  <option key={storeOption} value={storeOption}>
+                    {storeOption}
+                  </option>
+                ))}
+              </select>
+              {form.store && <img src={`/assets/${form.store}.png`} alt={`${form.store} logo`} style={{ height: '30px' }} />}
+            </div>
           </label>
           <label className="field" htmlFor="quality">
             <span>Качество</span>

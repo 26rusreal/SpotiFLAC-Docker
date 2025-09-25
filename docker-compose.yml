@@ -8,7 +8,7 @@ services:
       - CONFIG_DIR=/config
       - TZ=UTC
     volumes:
-      - ./data/downloads:/downloads
+      - /mnt/data/data/music/Spotify Playlists:/downloads
       - ./data/config:/config
     ports:
       - "8082:8080"
