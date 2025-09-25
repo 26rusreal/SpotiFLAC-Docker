@@ -11,7 +11,7 @@ from app.core.models import DownloadMode
 from app.infra.settings import Settings
 
 DEFAULT_ARTIST_TEMPLATE = "{artist}/{album}/{track:02d} - {title}.{ext}"
-DEFAULT_SINGLE_TEMPLATE = "{artist} - {album} - {track:02d} - {title}.{ext}"
+DEFAULT_SINGLE_TEMPLATE = "{playlist}/{track:02d} - {artist} - {title}.{ext}"
 
 
 @dataclass

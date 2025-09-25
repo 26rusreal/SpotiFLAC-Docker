@@ -12,6 +12,8 @@ from app.api.schemas import (
     AppSettingsModel,
     FileItem,
     FilesResponse,
+    HistoryItem,
+    HistoryResponse,
     JobCreateRequest,
     JobModel,
     JobResponse,
@@ -155,6 +157,21 @@ async def cancel_job(job_id: str) -> Dict[str, object]:
 @app.get("/files", response_model=FilesResponse)
 async def list_files() -> FilesResponse:
     files = [FileItem(**item) for item in service.get_files()]
+    return FilesResponse(files=files)
+
+
+@app.get("/history", response_model=HistoryResponse)
+async def history() -> HistoryResponse:
+    items = [HistoryItem(**item) for item in service.get_history()]
+    return HistoryResponse(history=items)
+
+
+@app.get("/jobs/{job_id}/files", response_model=FilesResponse)
+async def job_files(job_id: str) -> FilesResponse:
+    snapshot = service.get_job(job_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    files = [FileItem(**item) for item in service.get_job_files(job_id)]
     return FilesResponse(files=files)
 
 

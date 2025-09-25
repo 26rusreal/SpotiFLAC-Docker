@@ -89,6 +89,7 @@ class DownloadJob:
     source_url: str
     quality: Optional[str]
     path_template: str
+    mode: DownloadMode = DownloadMode.BY_ARTIST
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     finished_at: Optional[datetime] = None
@@ -101,6 +102,7 @@ class DownloadJob:
     error: Optional[str] = None
     output_dir: str = ""
     logs: List[str] = field(default_factory=list)
+    collection_name: Optional[str] = None
 
     def touch(self) -> None:
         """Обновляет метку времени обновления."""
@@ -122,6 +124,8 @@ class DownloadJob:
         data["provider"] = self.provider.value
         data["store"] = self.store.value
         data["status"] = self.status.value
+        data["mode"] = self.mode.value
+        data["collection_name"] = self.collection_name
         return data
 
 
@@ -135,6 +139,7 @@ class JobSnapshot:
     source_url: str
     quality: Optional[str]
     path_template: str
+    mode: str
     created_at: str
     updated_at: str
     finished_at: Optional[str]
@@ -147,6 +152,7 @@ class JobSnapshot:
     error: Optional[str]
     output_dir: str
     logs: List[str]
+    collection_name: Optional[str]
 
 
 @dataclass

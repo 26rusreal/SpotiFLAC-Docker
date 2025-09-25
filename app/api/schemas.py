@@ -28,6 +28,7 @@ class JobModel(BaseModel):
     source_url: str
     quality: Optional[str]
     path_template: str
+    mode: str
     created_at: str
     updated_at: str
     finished_at: Optional[str]
@@ -40,6 +41,7 @@ class JobModel(BaseModel):
     error: Optional[str]
     output_dir: str
     logs: List[str]
+    collection_name: Optional[str]
 
 
 class JobResponse(BaseModel):
@@ -63,6 +65,21 @@ class FileItem(BaseModel):
 
 class FilesResponse(BaseModel):
     files: List[FileItem]
+
+
+class HistoryItem(BaseModel):
+    job_id: str
+    playlist: str
+    status: str
+    created_at: str
+    finished_at: Optional[str]
+    total_tracks: int
+    completed_tracks: int
+    failed_tracks: int
+
+
+class HistoryResponse(BaseModel):
+    history: List[HistoryItem]
 
 
 class ProxySettingsModel(BaseModel):

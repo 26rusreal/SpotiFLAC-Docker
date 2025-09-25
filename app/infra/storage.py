@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.core.models import DownloadJob, FileEntry, TrackMetadata
-from app.core.utils import render_path
+from app.core.models import DownloadJob, DownloadMode, FileEntry, TrackMetadata
+from app.core.utils import render_path, sanitize_component
 
 
 class StorageManager:
@@ -26,7 +26,17 @@ class StorageManager:
 
     def build_track_path(self, job: DownloadJob, track: TrackMetadata) -> Path:
         template = job.path_template or self.default_template
-        relative = render_path(template, track.as_context())
+        context = track.as_context()
+        playlist_name = job.collection_name or job.message or "Playlist"
+        if "{playlist" in template or job.mode == DownloadMode.SINGLE_FOLDER:
+            context["playlist"] = playlist_name
+        relative = render_path(template, context)
+        if (
+            job.mode == DownloadMode.SINGLE_FOLDER
+            and playlist_name
+            and "{playlist" not in template
+        ):
+            relative = Path(sanitize_component(str(playlist_name))) / relative
         return self.download_dir / relative
 
     def list_downloads(self) -> List[FileEntry]:

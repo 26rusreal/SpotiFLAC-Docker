@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  cancelJob,
   createJob,
-  fetchFiles,
+  fetchHistory,
+  fetchJobFiles,
   fetchJobLogs,
   fetchJobs,
   fetchProviders,
@@ -14,6 +16,7 @@ import type {
   DownloadMode,
   DownloadSettings,
   FileItem,
+  HistoryItem,
   JobModel,
   ProvidersResponse
 } from "./types";
@@ -35,7 +38,7 @@ interface ProxyFormState {
 }
 
 const DEFAULT_BY_ARTIST_TEMPLATE = "{artist}/{album}/{track:02d} - {title}.{ext}";
-const DEFAULT_SINGLE_TEMPLATE = "{artist} - {album} - {track:02d} - {title}.{ext}";
+const DEFAULT_SINGLE_TEMPLATE = "{playlist}/{track:02d} - {artist} - {title}.{ext}";
 
 const STATUS_STYLE: Record<string, { label: string; color: string }> = {
   pending: { label: "В очереди", color: "#60a5fa" },
@@ -97,7 +100,11 @@ const DEFAULT_PROXY_FORM: ProxyFormState = {
 const App: React.FC = () => {
   const [providers, setProviders] = useState<ProvidersResponse | null>(null);
   const [jobs, setJobs] = useState<JobModel[]>([]);
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyFiles, setHistoryFiles] = useState<Record<string, FileItem[]>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFilesLoading, setHistoryFilesLoading] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [proxyForm, setProxyForm] = useState<ProxyFormState>(DEFAULT_PROXY_FORM);
   const [downloadSettings, setDownloadSettings] = useState<DownloadSettings | null>(null);
@@ -111,6 +118,7 @@ const App: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
   const [jobLogs, setJobLogs] = useState<string[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState<Record<string, boolean>>({});
 
   const updateJobList = useCallback((current: JobModel[], incoming: JobModel): JobModel[] => {
     const index = current.findIndex((item) => item.id === incoming.id);
@@ -122,12 +130,27 @@ const App: React.FC = () => {
     return [...current, incoming];
   }, []);
 
-  const refreshFiles = useCallback(async () => {
+  const refreshHistory = useCallback(async () => {
+    setHistoryLoading(true);
     try {
-      const response = await fetchFiles();
-      setFiles(response.files);
+      const response = await fetchHistory();
+      const ids = new Set(response.history.map((item) => item.job_id));
+      setHistory(response.history);
+      setHistoryFiles((prev) => {
+        const next: Record<string, FileItem[]> = {};
+        Object.entries(prev).forEach(([key, value]) => {
+          if (ids.has(key)) {
+            next[key] = value;
+          }
+        });
+        return next;
+      });
+      setExpandedHistoryId((prev) => (prev && ids.has(prev) ? prev : null));
     } catch (err) {
       console.error(err);
+      setError((err as Error).message);
+    } finally {
+      setHistoryLoading(false);
     }
   }, []);
 
@@ -141,6 +164,22 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const loadHistoryFiles = useCallback(
+    async (jobId: string) => {
+      setHistoryFilesLoading(jobId);
+      try {
+        const response = await fetchJobFiles(jobId);
+        setHistoryFiles((prev) => ({ ...prev, [jobId]: response.files }));
+      } catch (err) {
+        console.error(err);
+        setError((err as Error).message);
+      } finally {
+        setHistoryFilesLoading(null);
+      }
+    },
+    []
+  );
+
   const applyTemplate = useCallback((template: string, force = false) => {
     setAutoTemplate(template);
     if (force || !pathTemplateEdited) {
@@ -149,18 +188,30 @@ const App: React.FC = () => {
     }
   }, [pathTemplateEdited]);
 
+  const handleToggleHistory = useCallback(
+    (jobId: string) => {
+      if (expandedHistoryId !== jobId && !historyFiles[jobId]) {
+        void loadHistoryFiles(jobId);
+      }
+      setExpandedHistoryId((prev) => (prev === jobId ? null : jobId));
+    },
+    [expandedHistoryId, historyFiles, loadHistoryFiles]
+  );
+
   useEffect(() => {
     (async () => {
       try {
-        const [prov, jobsResponse, filesResponse, settingsResponse] = await Promise.all([
+        const [prov, jobsResponse, historyResponse, settingsResponse] = await Promise.all([
           fetchProviders(),
           fetchJobs(),
-          fetchFiles(),
+          fetchHistory(),
           fetchSettings()
         ]);
         setProviders(prov);
         setJobs(sortJobs(jobsResponse.jobs));
-        setFiles(filesResponse.files);
+        setHistory(historyResponse.history);
+        setHistoryFiles({});
+        setExpandedHistoryId(null);
         setForm((prev) => ({
           ...prev,
           store: prov.stores[0] ?? prev.store,
@@ -197,12 +248,15 @@ const App: React.FC = () => {
       if (shouldSyncLogs) {
         setJobLogs(job.logs);
       }
-      if (job.status === "completed") {
-        refreshFiles();
+      if (["completed", "failed", "cancelled"].includes(job.status)) {
+        void refreshHistory();
+        if (expandedHistoryId === job.id) {
+          void loadHistoryFiles(job.id);
+        }
       }
     });
     return unsubscribe;
-  }, [refreshFiles, updateJobList]);
+  }, [expandedHistoryId, loadHistoryFiles, refreshHistory, updateJobList]);
 
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = event.target.value;
@@ -386,6 +440,31 @@ const App: React.FC = () => {
       setBusy(false);
     }
   };
+
+  const handleCancelJob = useCallback(
+    async (job: JobModel, event: React.MouseEvent) => {
+      event.stopPropagation();
+      if (job.status !== "running" && job.status !== "pending") {
+        return;
+      }
+      setCancelBusy((prev) => ({ ...prev, [job.id]: true }));
+      setError(null);
+      try {
+        await cancelJob(job.id);
+        setMessage("Остановка запрошена");
+        await refreshJobs();
+        await refreshHistory();
+        if (expandedHistoryId === job.id) {
+          await loadHistoryFiles(job.id);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setCancelBusy((prev) => ({ ...prev, [job.id]: false }));
+      }
+    },
+    [expandedHistoryId, loadHistoryFiles, refreshHistory, refreshJobs]
+  );
 
   const handleSelectJob = async (job: JobModel) => {
     setSelectedJob(job);
@@ -588,18 +667,65 @@ const App: React.FC = () => {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2>Недавние файлы</h2>
-              <p className="muted">Последние результаты из каталога /downloads</p>
+              <h2>История загрузок</h2>
+              <p className="muted">Последние плейлисты и содержимое папок</p>
             </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                void refreshHistory();
+              }}
+              disabled={historyLoading}
+            >
+              {historyLoading ? "Обновление..." : "Обновить"}
+            </button>
           </div>
-          <div className="files-list">
-            {files.map((file) => (
-              <div className="file-card" key={file.path}>
-                <strong>{file.path}</strong>
-                <span>{humanSize(file.size)} · {formatDate(file.modified_at)}</span>
+          <div className="history-list">
+            {history.map((item) => (
+              <div
+                key={item.job_id}
+                className={`history-card${expandedHistoryId === item.job_id ? " open" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="history-toggle"
+                  onClick={() => handleToggleHistory(item.job_id)}
+                >
+                  <div className="history-info">
+                    <strong>{item.playlist}</strong>
+                    <span className="muted history-subline">
+                      {item.completed_tracks}/{item.total_tracks} треков
+                    </span>
+                  </div>
+                  <div className="history-meta">
+                    <span className="status-badge" style={{ color: statusColor(item.status) }}>
+                      <span className="dot" style={{ background: statusColor(item.status) }} />
+                      {statusLabel(item.status)}
+                    </span>
+                    <span className="muted">{formatDate(item.finished_at ?? item.created_at)}</span>
+                  </div>
+                </button>
+                {expandedHistoryId === item.job_id && (
+                  <div className="history-files">
+                    {historyFilesLoading === item.job_id && <p className="muted">Загрузка файлов...</p>}
+                    {historyFilesLoading !== item.job_id &&
+                      (historyFiles[item.job_id]?.length ?? 0) === 0 && (
+                        <p className="muted">Файлы пока не найдены.</p>
+                      )}
+                    {historyFilesLoading !== item.job_id &&
+                      (historyFiles[item.job_id] ?? []).map((file) => (
+                        <div className="file-card" key={`${item.job_id}-${file.path}`}>
+                          <strong>{file.path}</strong>
+                          <span>{humanSize(file.size)} · {formatDate(file.modified_at)}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             ))}
-            {files.length === 0 && <p className="muted">Файлы ещё не загружены.</p>}
+            {history.length === 0 && !historyLoading && <p className="muted">История пока пуста.</p>}
+            {historyLoading && history.length === 0 && <p className="muted">Загрузка истории...</p>}
           </div>
         </section>
       </div>
@@ -626,6 +752,7 @@ const App: React.FC = () => {
                   <th>Магазин</th>
                   <th>Создана</th>
                   <th>Сообщение</th>
+                  <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -647,11 +774,25 @@ const App: React.FC = () => {
                     <td>{job.store}</td>
                     <td>{formatDate(job.created_at)}</td>
                     <td>{job.message ?? job.error ?? ""}</td>
+                    <td>
+                      {(job.status === "pending" || job.status === "running") ? (
+                        <button
+                          type="button"
+                          className="danger-button small-button"
+                          onClick={(event) => handleCancelJob(job, event)}
+                          disabled={cancelBusy[job.id]}
+                        >
+                          {cancelBusy[job.id] ? "Остановка..." : "Остановить"}
+                        </button>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {jobs.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="empty-cell">Пока нет задач</td>
+                    <td colSpan={8} className="empty-cell">Пока нет задач</td>
                   </tr>
                 )}
               </tbody>

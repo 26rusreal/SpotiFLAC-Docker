@@ -32,6 +32,7 @@ export interface JobModel {
   source_url: string;
   quality: string | null;
   path_template: string;
+  mode: DownloadMode;
   created_at: string;
   updated_at: string;
   finished_at: string | null;
@@ -44,6 +45,7 @@ export interface JobModel {
   error: string | null;
   output_dir: string;
   logs: string[];
+  collection_name: string | null;
 }
 
 export interface JobResponse {
@@ -62,4 +64,19 @@ export interface FileItem {
 
 export interface FilesResponse {
   files: FileItem[];
+}
+
+export interface HistoryItem {
+  job_id: string;
+  playlist: string;
+  status: string;
+  created_at: string;
+  finished_at: string | null;
+  total_tracks: number;
+  completed_tracks: number;
+  failed_tracks: number;
+}
+
+export interface HistoryResponse {
+  history: HistoryItem[];
 }
