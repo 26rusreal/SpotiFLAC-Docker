@@ -20,7 +20,6 @@ class Settings:
     )
     worker_concurrency: int = int(os.environ.get("WORKER_CONCURRENCY", "1"))
     spotify_batch_delay: float = float(os.environ.get("SPOTIFY_BATCH_DELAY", "0.2"))
-    log_level: str = os.environ.get("LOG_LEVEL", "INFO")
 
     def ensure_dirs(self) -> None:
         self.download_dir.mkdir(parents=True, exist_ok=True)

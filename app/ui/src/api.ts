@@ -91,11 +91,6 @@ export async function saveTokens(provider: string, data: Record<string, unknown>
   });
 }
 
-export async function fetchJobLogs(jobId: string): Promise<string[]> {
-  const response = await request<{ logs: string[] }>(`/jobs/${jobId}/logs`);
-  return response.logs;
-}
-
 export async function updateSettings(body: AppSettings): Promise<AppSettings> {
   return request<AppSettings>("/settings", {
     method: "PUT",

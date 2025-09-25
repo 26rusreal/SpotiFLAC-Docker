@@ -101,7 +101,7 @@ class DownloadJob:
     message: Optional[str] = None
     error: Optional[str] = None
     output_dir: str = ""
-    logs: List[str] = field(default_factory=list)
+    downloaded_files: List[str] = field(default_factory=list)
     collection_name: Optional[str] = None
 
     def touch(self) -> None:
@@ -151,8 +151,8 @@ class JobSnapshot:
     message: Optional[str]
     error: Optional[str]
     output_dir: str
-    logs: List[str]
     collection_name: Optional[str]
+    downloaded_files: List[str]
 
 
 @dataclass

@@ -46,8 +46,6 @@ async def _watch_job(service, job_id: str) -> JobStatus:
                 JobStatus.FAILED.value,
                 JobStatus.CANCELLED.value,
             }:
-                for line in snapshot.logs[-5:]:
-                    typer.echo(f" - {line}")
                 return JobStatus(snapshot.status)
     finally:
         service.unsubscribe_job(job_id, queue)

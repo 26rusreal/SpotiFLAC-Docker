@@ -9,7 +9,6 @@ from app.core.interfaces import StoreProvider
 from app.core.models import StoreType
 from app.core.service import DownloadService
 from app.infra.app_config import init_app_config
-from app.infra.logging import configure_logging
 from app.infra.settings import Settings
 from app.infra.storage import StorageManager
 
@@ -17,7 +16,6 @@ from app.infra.storage import StorageManager
 def create_service(settings: Settings) -> DownloadService:
     """Создаёт и настраивает сервис загрузок."""
 
-    configure_logging(settings.log_level)
     storage = StorageManager(settings.download_dir, settings.config_dir, settings.default_template)
     config_repo = init_app_config(settings.config_dir, settings=settings)
     playlist_provider = SpotifyPlaylistProvider(batch_delay=settings.spotify_batch_delay)
