@@ -44,7 +44,7 @@ export interface JobModel {
   message: string | null;
   error: string | null;
   output_dir: string;
-  logs: string[];
+  downloaded_files: string[];
   collection_name: string | null;
 }
 

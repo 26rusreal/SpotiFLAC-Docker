@@ -6,7 +6,7 @@ from typing import Dict
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse
 
 from app.api.schemas import (
     AppSettingsModel,
@@ -189,9 +189,3 @@ async def progress_ws(websocket: WebSocket) -> None:
         service.unsubscribe_global(queue)
 
 
-@app.get("/jobs/{job_id}/logs")
-async def job_logs(job_id: str) -> JSONResponse:
-    snapshot = service.get_job(job_id)
-    if not snapshot:
-        raise HTTPException(status_code=404, detail="Задача не найдена")
-    return JSONResponse({"logs": snapshot.logs})

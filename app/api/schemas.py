@@ -40,7 +40,7 @@ class JobModel(BaseModel):
     message: Optional[str]
     error: Optional[str]
     output_dir: str
-    logs: List[str]
+    downloaded_files: List[str]
     collection_name: Optional[str]
 
 

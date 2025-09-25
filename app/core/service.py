@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import logging
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -32,8 +31,6 @@ from app.infra.app_config import (
     get_app_config,
 )
 from app.infra.storage import StorageManager
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -64,7 +61,6 @@ class JobState:
             try:
                 queue.put_nowait(snapshot)
             except asyncio.QueueFull:
-                logger.warning("Очередь подписчика переполнена, удаляем", exc_info=False)
                 self.subscribers.remove(queue)
 
 
@@ -96,9 +92,11 @@ class DownloadService:
         if self._started:
             return
         self.storage.ensure_directories()
-        self._workers = [asyncio.create_task(self._worker(), name=f"job-worker-{i}") for i in range(self.worker_concurrency)]
+        self._workers = [
+            asyncio.create_task(self._worker(), name=f"job-worker-{i}")
+            for i in range(self.worker_concurrency)
+        ]
         self._started = True
-        logger.info("Очередь загрузок запущена", extra={"workers": self.worker_concurrency})
 
     @property
     def started(self) -> bool:
@@ -114,7 +112,6 @@ class DownloadService:
                 await worker
         self._workers.clear()
         self._started = False
-        logger.info("Очередь загрузок остановлена")
 
     async def submit_job(self, request: JobRequest) -> JobSnapshot:
         if not self._started:
@@ -138,7 +135,6 @@ class DownloadService:
         state.notify()
         self._broadcast(state)
         await self._queue.put(job_id)
-        logger.info("Добавлена задача", extra={"job_id": job_id, "store": job.store.value})
         return state.snapshot()
 
     def get_job(self, job_id: str) -> Optional[JobSnapshot]:
@@ -180,11 +176,10 @@ class DownloadService:
         if not state:
             return False
         state.cancel_requested = True
-        state.job.logs.append("Отмена запрошена пользователем")
+        state.job.message = "Отмена запрошена пользователем"
         state.job.touch()
         state.notify()
         self._broadcast(state)
-        logger.info("Отмена задачи", extra={"job_id": job_id})
         return True
 
     async def _worker(self) -> None:
@@ -210,18 +205,15 @@ class DownloadService:
                     job.message = "Задача отменена"
                     job.finished_at = datetime.utcnow()
                     job.touch()
-                    logger.info("Задача отменена", extra={"job_id": job.id})
                 except Exception as exc:  # noqa: BLE001
                     job.status = JobStatus.FAILED
                     job.error = str(exc)
                     job.finished_at = datetime.utcnow()
                     job.touch()
-                    logger.exception("Ошибка выполнения задачи", exc_info=exc, extra={"job_id": job.id})
                 else:
                     job.status = JobStatus.COMPLETED
                     job.finished_at = datetime.utcnow()
                     job.touch()
-                    logger.info("Задача завершена", extra={"job_id": job.id})
 
                 state.notify()
                 self._broadcast(state)
@@ -252,7 +244,6 @@ class DownloadService:
                 raise JobCancelled()
             if not track.isrc:
                 job.failed_tracks += 1
-                job.logs.append(f"Пропущен {track.title} — отсутствует ISRC")
                 job.touch()
                 state.notify()
                 self._broadcast(state)
@@ -262,7 +253,6 @@ class DownloadService:
             final_path.parent.mkdir(parents=True, exist_ok=True)
             if final_path.exists():
                 job.completed_tracks += 1
-                job.logs.append(f"Пропуск: {final_path.name} уже существует")
                 job.progress = clamp_progress(job.completed_tracks, job.total_tracks)
                 job.touch()
                 state.notify()
@@ -280,13 +270,13 @@ class DownloadService:
                 if downloaded_path != final_path:
                     shutil.move(downloaded_path, final_path)
                 job.completed_tracks += 1
-                job.logs.append(f"Сохранено: {final_path.relative_to(self.storage.download_dir)}")
+                relative_path = str(final_path.relative_to(self.storage.download_dir))
+                if relative_path not in job.downloaded_files:
+                    job.downloaded_files.append(relative_path)
             except JobCancelled:
                 raise
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 job.failed_tracks += 1
-                job.logs.append(f"Ошибка: {track.title} — {exc}")
-                logger.exception("Ошибка загрузки трека", exc_info=exc, extra={"job_id": job.id})
             finally:
                 job.progress = clamp_progress(job.completed_tracks, job.total_tracks)
                 job.touch()
@@ -299,7 +289,6 @@ class DownloadService:
             try:
                 queue.put_nowait(snapshot)
             except asyncio.QueueFull:
-                logger.warning("Глобальная очередь переполнена, удаляем подписчика", exc_info=False)
                 self._global_subscribers.remove(queue)
 
     def get_files(self) -> List[Dict[str, object]]:
@@ -334,11 +323,7 @@ class DownloadService:
             return []
         files: List[Dict[str, object]] = []
         seen: set[str] = set()
-        for line in state.job.logs:
-            prefix = "Сохранено:"
-            if not line.startswith(prefix):
-                continue
-            relative = line[len(prefix) :].strip()
+        for relative in state.job.downloaded_files:
             if not relative or relative in seen:
                 continue
             seen.add(relative)

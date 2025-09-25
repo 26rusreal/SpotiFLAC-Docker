@@ -4,7 +4,6 @@ import {
   createJob,
   fetchHistory,
   fetchJobFiles,
-  fetchJobLogs,
   fetchJobs,
   fetchProviders,
   fetchSettings,
@@ -115,9 +114,7 @@ const App: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [proxyBusy, setProxyBusy] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
-  const [jobLogs, setJobLogs] = useState<string[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [listView, setListView] = useState<"queue" | "history">("queue");
   const [cancelBusy, setCancelBusy] = useState<Record<string, boolean>>({});
 
   const updateJobList = useCallback((current: JobModel[], incoming: JobModel): JobModel[] => {
@@ -241,17 +238,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = subscribeProgress((job) => {
       setJobs((prev) => sortJobs(updateJobList(prev, job)));
-      let shouldSyncLogs = false;
-      setSelectedJob((prev) => {
-        if (prev && prev.id === job.id) {
-          shouldSyncLogs = true;
-          return job;
-        }
-        return prev;
-      });
-      if (shouldSyncLogs) {
-        setJobLogs(job.logs);
-      }
       if (["completed", "failed", "cancelled"].includes(job.status)) {
         void refreshHistory();
         if (expandedHistoryId === job.id) {
@@ -470,55 +456,28 @@ const App: React.FC = () => {
     [expandedHistoryId, loadHistoryFiles, refreshHistory, refreshJobs]
   );
 
-  const handleSelectJob = async (job: JobModel) => {
-    setSelectedJob(job);
-    setJobLogs(job.logs);
-    setLogsLoading(true);
-    try {
-      const logs = await fetchJobLogs(job.id);
-      setJobLogs(logs);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLogsLoading(false);
-    }
-  };
-
   const statusLabel = (status: string) => STATUS_STYLE[status]?.label ?? status;
   const statusColor = (status: string) => STATUS_STYLE[status]?.color ?? "#cbd5f5";
-
   const activeDownloadMode: DownloadMode = downloadSettings?.mode ?? "single_folder";
+  const currentTemplate = downloadSettings?.active_template ?? autoTemplate;
 
   return (
     <main className="app-shell">
       <header className="app-header">
-        <div className="header-brand">
-          <span className="brand-mark">SF</span>
-          <div>
-            <h1>SpotiFLAC Studio</h1>
-            <p className="muted">
-              Панель управления загрузками с акцентом на скорость, чистоту каталога и мгновенный контроль.
-            </p>
-          </div>
-        </div>
-        <div className="header-actions">
-          <span className="chip">API v1</span>
-          <span className="chip chip--accent">Lossless Ready</span>
-        </div>
+        <h1>SpotiFLAC Studio</h1>
+        <p className="muted">Минималистичная панель для управления загрузками.</p>
       </header>
 
       {message && <div className="alert success">{message}</div>}
       {error && <div className="alert error">{error}</div>}
 
-      <div className="grid grid--two">
-        <section className="panel panel--highlight">
-          <div className="panel-header">
-            <div>
-              <h2>Структура файлов</h2>
-              <p className="muted">Выберите, как организовать загруженные треки</p>
-            </div>
+      <section className="panel panel--form">
+        <div className="panel-heading">
+          <div>
+            <h2>Новая загрузка</h2>
+            <p className="muted">Укажите ссылку и подходящую структуру каталогов.</p>
           </div>
-          <div className="segmented">
+          <div className="mode-switch">
             <button
               type="button"
               className={activeDownloadMode === "by_artist" ? "active" : ""}
@@ -531,99 +490,172 @@ const App: React.FC = () => {
               className={activeDownloadMode === "single_folder" ? "active" : ""}
               onClick={() => handleDownloadModeChange("single_folder")}
             >
-              Сохранение в папку
+              В одну папку
             </button>
           </div>
-          <div className="template-preview">
-            <span className="muted">Текущий шаблон</span>
-            <code>{downloadSettings?.active_template ?? autoTemplate}</code>
-            <p className="muted">Шаблон применяется ко всем новым задачам. Вы можете вручную переопределить путь при создании загрузки.</p>
-          </div>
-          <div className="panel-actions">
+        </div>
+        <form onSubmit={handleCreateJob} className="form-grid">
+          <label className="field span-2" htmlFor="url">
+            <span>Spotify URL</span>
+            <input
+              id="url"
+              placeholder="https://open.spotify.com/..."
+              value={form.url}
+              onChange={handleChange("url")}
+            />
+          </label>
+          <label className="field" htmlFor="store">
+            <span>Магазин</span>
+            <select id="store" value={form.store} onChange={handleChange("store")}>
+              {(providers?.stores ?? []).map((storeOption) => (
+                <option key={storeOption} value={storeOption}>
+                  {storeOption}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field" htmlFor="quality">
+            <span>Качество</span>
+            <input
+              id="quality"
+              placeholder="LOSSLESS / 24-bit / ..."
+              value={form.quality}
+              onChange={handleChange("quality")}
+            />
+          </label>
+          <label className="field span-2" htmlFor="template">
+            <span>Шаблон пути</span>
+            <input
+              id="template"
+              placeholder="{artist}/{album}/{track:02d} - {title}.{ext}"
+              value={form.pathTemplate}
+              onChange={handleChange("pathTemplate")}
+            />
+            <small className="hint muted">
+              Активный шаблон: {currentTemplate}. Оставьте поле пустым, чтобы использовать его автоматически.
+            </small>
+          </label>
+          <div className="template-actions span-2">
             <button type="button" className="ghost-button" onClick={handleResetTemplate}>
               Сбросить шаблон
             </button>
             <button type="button" onClick={handleSaveDownload} disabled={downloadBusy}>
-              {downloadBusy ? "Сохранение..." : "Сохранить режим"}
+              {downloadBusy ? "Сохранение..." : "Сохранить структуру"}
             </button>
           </div>
-        </section>
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Новая задача</h2>
-              <p className="muted">Создайте загрузку из ссылки Spotify</p>
-            </div>
+          <div className="submit-row span-2">
+            <button type="submit" disabled={busy}>
+              {busy ? "Создание..." : "Создать задачу"}
+            </button>
           </div>
-          <form onSubmit={handleCreateJob} className="panel-form">
-            <div className="form-grid">
-              <div className="span-2">
-                <label htmlFor="url">Spotify URL</label>
-                <input
-                  id="url"
-                  placeholder="https://open.spotify.com/..."
-                  value={form.url}
-                  onChange={handleChange("url")}
-                />
-              </div>
-              <div>
-                <label htmlFor="store">Магазин загрузки</label>
-                <select id="store" value={form.store} onChange={handleChange("store") }>
-                  {(providers?.stores ?? []).map((storeOption) => (
-                    <option key={storeOption} value={storeOption}>
-                      {storeOption}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="quality">Качество</label>
-                <input
-                  id="quality"
-                  placeholder="LOSSLESS / 24-bit / ..."
-                  value={form.quality}
-                  onChange={handleChange("quality")}
-                />
-              </div>
-              <div className="span-2">
-                <label htmlFor="template">Шаблон пути</label>
-                <input
-                  id="template"
-                  placeholder="{artist}/{album}/{track:02d} - {title}.{ext}"
-                  value={form.pathTemplate}
-                  onChange={handleChange("pathTemplate")}
-                />
-                <p className="hint muted">Необязательно. Если оставить пустым, будет использован выбранный выше режим.</p>
-              </div>
-            </div>
-            <div className="panel-actions">
-              <button type="submit" disabled={busy}>
-                {busy ? "Создание..." : "Создать задачу"}
-              </button>
-            </div>
-          </form>
-        </section>
-      </div>
+        </form>
+      </section>
 
-      <div className="grid">
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>История загрузок</h2>
-              <p className="muted">Последние плейлисты и содержимое папок</p>
+      <section className="panel panel--list">
+        <div className="panel-heading">
+          <div>
+            <h2>{listView === "queue" ? "Очередь" : "История загрузок"}</h2>
+            <p className="muted">
+              {listView === "queue"
+                ? "Следите за состоянием текущих задач."
+                : "Просматривайте результаты и содержимое загрузок."}
+            </p>
+          </div>
+          <div className="panel-controls">
+            <div className="toggle">
+              <button
+                type="button"
+                className={listView === "queue" ? "active" : ""}
+                onClick={() => setListView("queue")}
+              >
+                Очередь
+              </button>
+              <button
+                type="button"
+                className={listView === "history" ? "active" : ""}
+                onClick={() => setListView("history")}
+              >
+                История
+              </button>
             </div>
             <button
               type="button"
               className="ghost-button"
-              onClick={() => {
+              onClick={listView === "queue" ? refreshJobs : () => {
                 void refreshHistory();
               }}
-              disabled={historyLoading}
+              disabled={listView === "history" && historyLoading}
             >
-              {historyLoading ? "Обновление..." : "Обновить"}
+              {listView === "history" && historyLoading ? "Обновление..." : "Обновить"}
             </button>
           </div>
+        </div>
+
+        {listView === "queue" ? (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Статус</th>
+                  <th>Прогресс</th>
+                  <th>Треки</th>
+                  <th>Магазин</th>
+                  <th>Создана</th>
+                  <th>Сообщение</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td className="mono">{job.id.slice(0, 8)}</td>
+                    <td>
+                      <span className="status-badge" style={{ color: statusColor(job.status) }}>
+                        <span className="dot" style={{ background: statusColor(job.status) }} />
+                        {statusLabel(job.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="progress-bar">
+                        <span style={{ width: `${Math.round(job.progress * 100)}%` }} />
+                      </div>
+                    </td>
+                    <td>
+                      {job.completed_tracks}/{job.total_tracks}
+                    </td>
+                    <td>{job.store}</td>
+                    <td>{formatDate(job.created_at)}</td>
+                    <td>{job.message ?? job.error ?? ""}</td>
+                    <td>
+                      {job.status === "pending" || job.status === "running" ? (
+                        <button
+                          type="button"
+                          className="danger-button small-button"
+                          onClick={(event) => handleCancelJob(job, event)}
+                          disabled={cancelBusy[job.id]}
+                        >
+                          {cancelBusy[job.id] ? "Остановка..." : "Остановить"}
+                        </button>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {jobs.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="empty-cell">
+                      Пока нет задач
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
           <div className="history-list">
+            {historyLoading && history.length === 0 && <p className="muted">Загрузка истории...</p>}
             {history.map((item) => (
               <div
                 key={item.job_id}
@@ -641,8 +673,7 @@ const App: React.FC = () => {
                     </span>
                   </div>
                   <div className="history-meta">
-                    <span className="status-badge" style={{ color: statusColor(item.status) }}>
-                      <span className="dot" style={{ background: statusColor(item.status) }} />
+                    <span className={`status-badge status-badge--${item.status}`}>
                       {statusLabel(item.status)}
                     </span>
                     <span className="muted">{formatDate(item.finished_at ?? item.created_at)}</span>
@@ -650,191 +681,93 @@ const App: React.FC = () => {
                 </button>
                 {expandedHistoryId === item.job_id && (
                   <div className="history-files">
-                    {historyFilesLoading === item.job_id && <p className="muted">Загрузка файлов...</p>}
+                    {historyFilesLoading === item.job_id && <p className="muted">Загрузка...</p>}
                     {historyFilesLoading !== item.job_id &&
                       (historyFiles[item.job_id]?.length ?? 0) === 0 && (
-                        <p className="muted">Файлы пока не найдены.</p>
+                        <p className="muted">Нет файлов для показа</p>
                       )}
                     {historyFilesLoading !== item.job_id &&
                       (historyFiles[item.job_id] ?? []).map((file) => (
                         <div className="file-card" key={`${item.job_id}-${file.path}`}>
                           <strong>{file.path}</strong>
-                          <span>{humanSize(file.size)} · {formatDate(file.modified_at)}</span>
+                          <span>{humanSize(file.size)}</span>
                         </div>
                       ))}
                   </div>
                 )}
               </div>
             ))}
-            {history.length === 0 && !historyLoading && <p className="muted">История пока пуста.</p>}
-            {historyLoading && history.length === 0 && <p className="muted">Загрузка истории...</p>}
+            {history.length === 0 && !historyLoading && <p className="muted empty-line">История пока пуста.</p>}
           </div>
-        </section>
-      </div>
+        )}
+      </section>
 
-      <div className="grid grid--main">
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Очередь</h2>
-              <p className="muted">Активные и завершённые задачи</p>
-            </div>
-            <button type="button" className="ghost-button" onClick={refreshJobs}>
-              Обновить
+      <section className="panel panel--settings">
+        <div className="panel-heading">
+          <div>
+            <h2>Сеть и прокси</h2>
+            <p className="muted">Настройте доступ при необходимости.</p>
+          </div>
+        </div>
+        <form onSubmit={handleSaveProxy} className="proxy-form">
+          <div className="proxy-row">
+            <label className="switch switch--inline" htmlFor="proxy-enabled">
+              <input
+                id="proxy-enabled"
+                type="checkbox"
+                checked={proxyForm.enabled}
+                onChange={handleProxyToggle}
+              />
+              <span>Использовать прокси</span>
+            </label>
+            <button type="submit" className="small-button" disabled={proxyBusy}>
+              {proxyBusy ? "Сохранение..." : "Сохранить"}
             </button>
           </div>
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Статус</th>
-                  <th>Прогресс</th>
-                  <th>Треки</th>
-                  <th>Магазин</th>
-                  <th>Создана</th>
-                  <th>Сообщение</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <tr key={job.id} onClick={() => handleSelectJob(job)}>
-                    <td className="mono">{job.id.slice(0, 8)}</td>
-                    <td>
-                      <span className="status-badge" style={{ color: statusColor(job.status) }}>
-                        <span className="dot" style={{ background: statusColor(job.status) }} />
-                        {statusLabel(job.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="progress-bar">
-                        <span style={{ width: `${Math.round(job.progress * 100)}%` }} />
-                      </div>
-                    </td>
-                    <td>{job.completed_tracks}/{job.total_tracks}</td>
-                    <td>{job.store}</td>
-                    <td>{formatDate(job.created_at)}</td>
-                    <td>{job.message ?? job.error ?? ""}</td>
-                    <td>
-                      {(job.status === "pending" || job.status === "running") ? (
-                        <button
-                          type="button"
-                          className="danger-button small-button"
-                          onClick={(event) => handleCancelJob(job, event)}
-                          disabled={cancelBusy[job.id]}
-                        >
-                          {cancelBusy[job.id] ? "Остановка..." : "Остановить"}
-                        </button>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {jobs.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="empty-cell">Пока нет задач</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
+          <div className="proxy-grid">
             <div>
-              <h2>Логи</h2>
-              <p className="muted">Выберите задачу, чтобы увидеть историю событий</p>
+              <label htmlFor="proxy-host">Адрес</label>
+              <input
+                id="proxy-host"
+                placeholder="127.0.0.1"
+                value={proxyForm.host}
+                onChange={handleProxyField("host")}
+              />
             </div>
-            {selectedJob && (
-              <span className="status-badge" style={{ color: statusColor(selectedJob.status) }}>
-                <span className="dot" style={{ background: statusColor(selectedJob.status) }} />
-                {statusLabel(selectedJob.status)}
-              </span>
-            )}
-          </div>
-          <div className="logs-box">
-            {logsLoading && <p>Загрузка логов...</p>}
-            {!logsLoading && selectedJob === null && <p className="muted">Выберите задачу в таблице.</p>}
-            {!logsLoading && selectedJob !== null && jobLogs.length === 0 && <p className="muted">Логи отсутствуют.</p>}
-            {!logsLoading &&
-              jobLogs.map((line, index) => (
-                <p key={`${line}-${index}`}>{line}</p>
-              ))}
-          </div>
-        </section>
-      </div>
-
-      <div className="grid">
-        <section className="panel panel--compact">
-          <div className="panel-header panel-header--compact">
             <div>
-              <h2>Сеть и прокси</h2>
-              <p className="muted">Настройки подключения при необходимости</p>
+              <label htmlFor="proxy-port">Порт</label>
+              <input
+                id="proxy-port"
+                placeholder="1080"
+                value={proxyForm.port}
+                inputMode="numeric"
+                onChange={handleProxyField("port")}
+              />
+            </div>
+            <div>
+              <label htmlFor="proxy-username">Логин</label>
+              <input
+                id="proxy-username"
+                placeholder="Необязательно"
+                value={proxyForm.username}
+                onChange={handleProxyField("username")}
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label htmlFor="proxy-password">Пароль</label>
+              <input
+                id="proxy-password"
+                type="password"
+                placeholder="Необязательно"
+                value={proxyForm.password}
+                onChange={handleProxyField("password")}
+                autoComplete="current-password"
+              />
             </div>
           </div>
-          <form onSubmit={handleSaveProxy} className="proxy-form">
-            <div className="proxy-row">
-              <label className="switch switch--inline" htmlFor="proxy-enabled">
-                <input
-                  id="proxy-enabled"
-                  type="checkbox"
-                  checked={proxyForm.enabled}
-                  onChange={handleProxyToggle}
-                />
-                <span>Использовать прокси</span>
-              </label>
-              <button type="submit" className="small-button" disabled={proxyBusy}>
-                {proxyBusy ? "Сохранение..." : "Сохранить"}
-              </button>
-            </div>
-            <div className="proxy-grid">
-              <div>
-                <label htmlFor="proxy-host">Адрес</label>
-                <input
-                  id="proxy-host"
-                  placeholder="127.0.0.1"
-                  value={proxyForm.host}
-                  onChange={handleProxyField("host")}
-                />
-              </div>
-              <div>
-                <label htmlFor="proxy-port">Порт</label>
-                <input
-                  id="proxy-port"
-                  placeholder="1080"
-                  value={proxyForm.port}
-                  inputMode="numeric"
-                  onChange={handleProxyField("port")}
-                />
-              </div>
-              <div>
-                <label htmlFor="proxy-username">Логин</label>
-                <input
-                  id="proxy-username"
-                  placeholder="Необязательно"
-                  value={proxyForm.username}
-                  onChange={handleProxyField("username")}
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <label htmlFor="proxy-password">Пароль</label>
-                <input
-                  id="proxy-password"
-                  type="password"
-                  placeholder="Необязательно"
-                  value={proxyForm.password}
-                  onChange={handleProxyField("password")}
-                  autoComplete="current-password"
-                />
-              </div>
-            </div>
-          </form>
-        </section>
-      </div>
+        </form>
+      </section>
     </main>
   );
 };
