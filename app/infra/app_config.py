@@ -68,7 +68,7 @@ class ProxySettings:
 class DownloadSettings:
     """Параметры структуры каталогов загрузок."""
 
-    mode: DownloadMode = DownloadMode.BY_ARTIST
+    mode: DownloadMode = DownloadMode.SINGLE_FOLDER
     by_artist_template: str = DEFAULT_ARTIST_TEMPLATE
     single_folder_template: str = DEFAULT_SINGLE_TEMPLATE
 
