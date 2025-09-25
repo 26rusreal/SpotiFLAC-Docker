@@ -5,7 +5,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.core.models import ProviderType, StoreType
+from app.core.models import DownloadMode, ProviderType, StoreType
+from app.infra.app_config import DEFAULT_ARTIST_TEMPLATE, DEFAULT_SINGLE_TEMPLATE
 
 
 class TokenPayload(BaseModel):
@@ -83,8 +84,43 @@ class ProxySettingsModel(BaseModel):
         return self
 
 
+class DownloadSettingsModel(BaseModel):
+    mode: DownloadMode = Field(
+        default=DownloadMode.BY_ARTIST,
+        description="Режим построения структуры каталогов",
+    )
+    active_template: str = Field(
+        default=DEFAULT_ARTIST_TEMPLATE,
+        description="Текущий шаблон с учётом выбранного режима",
+    )
+    by_artist_template: str = Field(
+        default=DEFAULT_ARTIST_TEMPLATE,
+        description="Шаблон для группировки по артистам",
+    )
+    single_folder_template: str = Field(
+        default=DEFAULT_SINGLE_TEMPLATE,
+        description="Шаблон для сохранения всех файлов в одной папке",
+    )
+
+    @model_validator(mode="after")
+    def ensure_active_template(self) -> "DownloadSettingsModel":
+        """Синхронизирует активный шаблон с выбранным режимом."""
+
+        target = (
+            self.single_folder_template
+            if self.mode == DownloadMode.SINGLE_FOLDER
+            else self.by_artist_template
+        )
+        object.__setattr__(self, "active_template", target)
+        return self
+
+
 class AppSettingsModel(BaseModel):
     proxy: ProxySettingsModel = Field(
         default_factory=ProxySettingsModel,
         description="Настройки доступа к Spotify",
+    )
+    download: DownloadSettingsModel = Field(
+        default_factory=DownloadSettingsModel,
+        description="Правила сохранения загруженных файлов",
     )

@@ -11,8 +11,18 @@ export interface ProxySettings {
   password: string;
 }
 
+export type DownloadMode = "by_artist" | "single_folder";
+
+export interface DownloadSettings {
+  mode: DownloadMode;
+  active_template: string;
+  by_artist_template: string;
+  single_folder_template: string;
+}
+
 export interface AppSettings {
   proxy: ProxySettings;
+  download: DownloadSettings;
 }
 
 export interface JobModel {

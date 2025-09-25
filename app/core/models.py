@@ -23,6 +23,13 @@ class StoreType(str, Enum):
     AMAZON = "amazon"
 
 
+class DownloadMode(str, Enum):
+    """Варианты организации каталога загрузок."""
+
+    BY_ARTIST = "by_artist"
+    SINGLE_FOLDER = "single_folder"
+
+
 class JobStatus(str, Enum):
     """Состояние задачи загрузки."""
 

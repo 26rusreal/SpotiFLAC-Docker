@@ -23,7 +23,12 @@ from .models import (
     TrackMetadata,
 )
 from .utils import clamp_progress
-from app.infra.app_config import AppConfigRepository, ProxySettings, get_app_config
+from app.infra.app_config import (
+    AppConfigRepository,
+    DownloadSettings,
+    ProxySettings,
+    get_app_config,
+)
 from app.infra.storage import StorageManager
 
 logger = logging.getLogger(__name__)
@@ -37,7 +42,7 @@ class JobRequest:
     store: StoreType
     url: str
     quality: Optional[str]
-    path_template: str
+    path_template: Optional[str]
 
 
 class JobState:
@@ -114,13 +119,15 @@ class DownloadService:
             raise RuntimeError("Сервис не запущен")
 
         job_id = uuid.uuid4().hex
+        template = self._resolve_template(request)
+
         job = DownloadJob(
             id=job_id,
             provider=request.provider,
             store=request.store,
             source_url=request.url,
             quality=request.quality,
-            path_template=request.path_template,
+            path_template=template,
             output_dir=str(self.storage.download_dir),
         )
         state = JobState(job)
@@ -305,8 +312,25 @@ class DownloadService:
 
         return self.config_repo.load().to_dict()
 
-    def update_settings(self, proxy: ProxySettings) -> Dict[str, object]:
-        """Обновляет параметры прокси и возвращает новые настройки."""
+    def update_settings(
+        self,
+        proxy: ProxySettings | None = None,
+        download: DownloadSettings | None = None,
+    ) -> Dict[str, object]:
+        """Обновляет параметры приложения и возвращает новые значения."""
 
-        updated = self.config_repo.update_proxy(proxy)
+        if proxy is None and download is None:
+            return self.get_settings()
+
+        updated = self.config_repo.update(proxy=proxy, download=download)
         return updated.to_dict()
+
+    def _resolve_template(self, request: JobRequest) -> str:
+        """Определяет шаблон пути для новой задачи."""
+
+        if request.path_template and request.path_template.strip():
+            return request.path_template.strip()
+
+        settings = self.config_repo.load()
+        template = settings.download.active_template or self.storage.default_template
+        return template or self.storage.default_template

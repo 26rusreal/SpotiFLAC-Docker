@@ -11,6 +11,7 @@
 * загрузка треков/альбомов/плейлистов Spotify через Qobuz, Tidal, Deezer и Amazon;
 * тегирование и переименование по шаблону `{artist}/{album}/{track:02d} - {title}.{ext}`;
 * хранение конфигурации и токенов в каталоге `/config`, файлов — в `/downloads`;
+* выбор структуры каталога загрузок: по артистам или в одну папку;
 * live-прогресс задач через WebSocket и обновляемый список файлов;
 * сборка через Docker/Docker Compose для API и UI.
 
@@ -59,6 +60,8 @@ python -m app.cli.main fetch \
 
 ## Веб-API
 
+Полное описание схем, запросов и форматов ответов доступно в [docs/API.md](docs/API.md).
+
 * `POST /auth/{provider}` — сохранить токены провайдера;
 * `GET /providers` — список доступных источников и магазинов;
 * `POST /jobs` — создать задачу (`provider`, `store`, `url`, опционально `quality`, `path_template`);
@@ -66,6 +69,7 @@ python -m app.cli.main fetch \
 * `DELETE /jobs/{id}` — отменить задачу;
 * `GET /jobs/{id}/logs` — последние записи лога;
 * `GET /files` — список выгруженных файлов;
+* `GET /settings` / `PUT /settings` — получить или обновить прокси и режим сохранения файлов;
 * `GET /healthz`, `/readyz`, `/metrics` — служебные эндпоинты;
 * `WS /ws/progress` — live-обновления задач.
 

@@ -74,7 +74,7 @@ def fetch(
                 store=_parse_store(store),
                 url=url,
                 quality=quality,
-                path_template=path_template or settings.default_template,
+                path_template=path_template,
             )
             snapshot = await service.submit_job(request)
             return await _watch_job(service, snapshot.id)

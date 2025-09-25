@@ -19,7 +19,7 @@ def create_service(settings: Settings) -> DownloadService:
 
     configure_logging(settings.log_level)
     storage = StorageManager(settings.download_dir, settings.config_dir, settings.default_template)
-    config_repo = init_app_config(settings.config_dir)
+    config_repo = init_app_config(settings.config_dir, settings=settings)
     playlist_provider = SpotifyPlaylistProvider(batch_delay=settings.spotify_batch_delay)
 
     store_providers: Dict[StoreType, StoreProvider] = {}
