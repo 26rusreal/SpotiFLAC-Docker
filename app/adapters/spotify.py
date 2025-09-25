@@ -8,13 +8,25 @@ import base64
 from random import randrange
 from typing import Dict, Any, List, Tuple
 
+from app.infra.app_config import get_app_config
+
 # https://github.com/visagenull/Spotify-Free
 def get_random_user_agent():
     return f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_{randrange(11, 15)}_{randrange(4, 9)}) AppleWebKit/{randrange(530, 537)}.{randrange(30, 37)} (KHTML, like Gecko) Chrome/{randrange(80, 105)}.0.{randrange(3000, 4500)}.{randrange(60, 125)} Safari/{randrange(530, 537)}.{randrange(30, 36)}"
 
+
+def _spotify_get(url: str, **kwargs):
+    """Выполняет запрос к Spotify c учётом настроек прокси."""
+
+    proxies = get_app_config().build_requests_proxies()
+    if proxies:
+        kwargs.setdefault("proxies", proxies)
+    return requests.get(url, **kwargs)
+
+
 def generate_totp():
     url = "https://raw.githubusercontent.com/Thereallo1026/spotify-secrets/refs/heads/main/secrets/secretBytes.json"
-    
+
     try:
         resp = requests.get(url, timeout=10)
         if resp.status_code != 200:
@@ -42,7 +54,7 @@ def generate_totp():
     }
 
     try:
-        resp = requests.get("https://open.spotify.com/api/server-time", headers=headers, timeout=10)
+        resp = _spotify_get("https://open.spotify.com/api/server-time", headers=headers, timeout=10)
         if resp.status_code != 200:
             raise Exception(f"Failed to get server time. Status code: {resp.status_code}")
         data = resp.json()
@@ -122,8 +134,8 @@ def parse_uri(uri):
 
 def get_json_from_api(api_url, access_token):
     headers.update({'Authorization': 'Bearer {}'.format(access_token)})
-    
-    req = requests.get(api_url, headers=headers, timeout=10)
+
+    req = _spotify_get(api_url, headers=headers, timeout=10)
 
     if req.status_code == 429:
         seconds = int(req.headers.get("Retry-After", "5")) + 1
@@ -153,8 +165,8 @@ def get_access_token():
             'buildVer': 'web-player_2025-07-02_1720000000000_12345678',
             'buildDate': '2025-07-02'
         }
-        
-        req = requests.get(token_url, headers=headers, params=params, timeout=10)
+
+        req = _spotify_get(token_url, headers=headers, params=params, timeout=10)
         if req.status_code != 200:
             return {"error": f"Failed to get access token. Status code: {req.status_code}"}
         return req.json()

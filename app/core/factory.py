@@ -8,6 +8,7 @@ from app.adapters.store_providers import STORE_REGISTRY
 from app.core.interfaces import StoreProvider
 from app.core.models import StoreType
 from app.core.service import DownloadService
+from app.infra.app_config import init_app_config
 from app.infra.logging import configure_logging
 from app.infra.settings import Settings
 from app.infra.storage import StorageManager
@@ -18,6 +19,7 @@ def create_service(settings: Settings) -> DownloadService:
 
     configure_logging(settings.log_level)
     storage = StorageManager(settings.download_dir, settings.config_dir, settings.default_template)
+    config_repo = init_app_config(settings.config_dir)
     playlist_provider = SpotifyPlaylistProvider(batch_delay=settings.spotify_batch_delay)
 
     store_providers: Dict[StoreType, StoreProvider] = {}
@@ -32,5 +34,6 @@ def create_service(settings: Settings) -> DownloadService:
         playlist_provider=playlist_provider,
         store_providers=store_providers,
         storage=storage,
+        config_repo=config_repo,
         worker_concurrency=settings.worker_concurrency,
     )

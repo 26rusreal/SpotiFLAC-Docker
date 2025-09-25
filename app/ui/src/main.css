@@ -50,7 +50,7 @@ label {
   color: #94a3b8;
 }
 
-input,
+input:not([type="checkbox"]),
 select,
 textarea {
   width: 100%;
@@ -63,7 +63,7 @@ textarea {
   transition: border 0.2s ease;
 }
 
-input:focus,
+input:not([type="checkbox"]):focus,
 select:focus,
 textarea:focus {
   outline: none;
@@ -93,10 +93,30 @@ button:disabled {
   box-shadow: none;
 }
 
+input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  cursor: pointer;
+  accent-color: #38bdf8;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.checkbox-field label {
+  margin: 0;
+  color: #e2e8f0;
+  font-weight: 500;
 }
 
 .alert {

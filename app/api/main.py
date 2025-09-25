@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.api.schemas import (
+    AppSettingsModel,
     FileItem,
     FilesResponse,
     JobCreateRequest,
@@ -20,6 +21,7 @@ from app.api.schemas import (
 )
 from app.core.factory import create_service
 from app.core.service import JobRequest
+from app.infra.app_config import ProxySettings
 from app.infra.settings import Settings
 
 settings = Settings()
@@ -57,6 +59,29 @@ async def healthz() -> Dict[str, str]:
 @app.get("/readyz")
 async def readyz() -> Dict[str, str]:
     return {"status": "ready" if service.started else "starting"}
+
+
+@app.get("/settings", response_model=AppSettingsModel)
+async def get_settings() -> AppSettingsModel:
+    """Возвращает текущие пользовательские настройки."""
+
+    data = service.get_settings()
+    return AppSettingsModel(**data)
+
+
+@app.put("/settings", response_model=AppSettingsModel)
+async def update_settings(payload: AppSettingsModel) -> AppSettingsModel:
+    """Сохраняет настройки прокси и возвращает актуальные значения."""
+
+    proxy = ProxySettings(
+        enabled=payload.proxy.enabled,
+        host=payload.proxy.host,
+        port=payload.proxy.port or 0,
+        username=payload.proxy.username,
+        password=payload.proxy.password,
+    )
+    updated = service.update_settings(proxy)
+    return AppSettingsModel(**updated)
 
 
 @app.get("/metrics")
