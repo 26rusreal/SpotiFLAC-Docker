@@ -15,6 +15,8 @@ from .exceptions import JobCancelled, ProviderError
 from .interfaces import PlaylistProvider, StoreProvider
 from .models import (
     DownloadJob,
+    DownloadMode,
+    FileEntry,
     JobSnapshot,
     JobStatus,
     ProviderType,
@@ -119,7 +121,7 @@ class DownloadService:
             raise RuntimeError("Сервис не запущен")
 
         job_id = uuid.uuid4().hex
-        template = self._resolve_template(request)
+        template, mode = self._resolve_template(request)
 
         job = DownloadJob(
             id=job_id,
@@ -129,6 +131,7 @@ class DownloadService:
             quality=request.quality,
             path_template=template,
             output_dir=str(self.storage.download_dir),
+            mode=mode,
         )
         state = JobState(job)
         self._jobs[job_id] = state
@@ -238,6 +241,7 @@ class DownloadService:
 
         job.total_tracks = len(tracks)
         job.message = resolved.name or resolved.source_type
+        job.collection_name = resolved.name or None
         job.output_dir = str(self.storage.download_dir)
         job.touch()
         state.notify()
@@ -301,6 +305,56 @@ class DownloadService:
     def get_files(self) -> List[Dict[str, object]]:
         return [entry.to_dict() for entry in self.storage.list_downloads()]
 
+    def get_history(self) -> List[Dict[str, object]]:
+        jobs = sorted(
+            self._jobs.values(),
+            key=lambda state: state.job.created_at,
+            reverse=True,
+        )
+        history: List[Dict[str, object]] = []
+        for state in jobs:
+            job = state.job
+            history.append(
+                {
+                    "job_id": job.id,
+                    "playlist": job.collection_name or job.message or job.source_url,
+                    "status": job.status.value,
+                    "created_at": job.created_at.isoformat(),
+                    "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+                    "total_tracks": job.total_tracks,
+                    "completed_tracks": job.completed_tracks,
+                    "failed_tracks": job.failed_tracks,
+                }
+            )
+        return history
+
+    def get_job_files(self, job_id: str) -> List[Dict[str, object]]:
+        state = self._jobs.get(job_id)
+        if not state:
+            return []
+        files: List[Dict[str, object]] = []
+        seen: set[str] = set()
+        for line in state.job.logs:
+            prefix = "Сохранено:"
+            if not line.startswith(prefix):
+                continue
+            relative = line[len(prefix) :].strip()
+            if not relative or relative in seen:
+                continue
+            seen.add(relative)
+            path = self.storage.download_dir / relative
+            if not path.exists() or not path.is_file():
+                continue
+            stat = path.stat()
+            entry = FileEntry(
+                path=Path(relative),
+                size_bytes=stat.st_size,
+                modified_at=datetime.utcfromtimestamp(stat.st_mtime),
+            )
+            files.append(entry.to_dict())
+        files.sort(key=lambda item: item["path"])
+        return files
+
     def get_providers(self) -> Dict[str, object]:
         return {
             "playlists": [job_provider.value for job_provider in ProviderType],
@@ -325,12 +379,13 @@ class DownloadService:
         updated = self.config_repo.update(proxy=proxy, download=download)
         return updated.to_dict()
 
-    def _resolve_template(self, request: JobRequest) -> str:
+    def _resolve_template(self, request: JobRequest) -> tuple[str, DownloadMode]:
         """Определяет шаблон пути для новой задачи."""
 
-        if request.path_template and request.path_template.strip():
-            return request.path_template.strip()
-
         settings = self.config_repo.load()
+
+        if request.path_template and request.path_template.strip():
+            return request.path_template.strip(), settings.download.mode
+
         template = settings.download.active_template or self.storage.default_template
-        return template or self.storage.default_template
+        return (template or self.storage.default_template, settings.download.mode)

@@ -331,6 +331,6 @@ async def test_режим_одной_папки_использует_шабло�
             path_template=None,
         )
         снимок = await сервис.submit_job(запрос)
-        assert снимок.path_template == "{artist} - {album} - {track:02d} - {title}.{ext}"
+        assert снимок.path_template == "{playlist}/{track:02d} - {artist} - {title}.{ext}"
     finally:
         await сервис.stop()

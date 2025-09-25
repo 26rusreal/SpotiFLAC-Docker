@@ -284,6 +284,84 @@ button:disabled {
   gap: 0.65rem;
 }
 
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-card {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  transition: border 0.2s ease, background 0.2s ease;
+}
+
+.history-card.open {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.history-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 1rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.history-toggle:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  color: #f8fafc;
+}
+
+.history-toggle:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.5);
+  outline-offset: 4px;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.history-info strong {
+  font-size: 1rem;
+}
+
+.history-subline {
+  font-size: 0.85rem;
+}
+
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.history-files {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.history-files .file-card {
+  background: rgba(15, 23, 42, 0.75);
+}
+
 .file-card {
   display: flex;
   flex-direction: column;
@@ -390,6 +468,22 @@ button:disabled {
 
 .mono {
   font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.small-button {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+.danger-button {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
+  box-shadow: none;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.28);
+  box-shadow: none;
 }
 
 @media (max-width: 960px) {

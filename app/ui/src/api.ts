@@ -1,4 +1,12 @@
-import type { AppSettings, FilesResponse, JobModel, JobResponse, JobsListResponse, ProvidersResponse } from "./types";
+import type {
+  AppSettings,
+  FilesResponse,
+  HistoryResponse,
+  JobModel,
+  JobResponse,
+  JobsListResponse,
+  ProvidersResponse
+} from "./types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "/api";
 
@@ -49,6 +57,14 @@ export async function fetchJobs(): Promise<JobsListResponse> {
 
 export async function fetchFiles(): Promise<FilesResponse> {
   return request<FilesResponse>("/files");
+}
+
+export async function fetchHistory(): Promise<HistoryResponse> {
+  return request<HistoryResponse>("/history");
+}
+
+export async function fetchJobFiles(jobId: string): Promise<FilesResponse> {
+  return request<FilesResponse>(`/jobs/${jobId}/files`);
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
@@ -108,4 +124,8 @@ export function subscribeProgress(onUpdate: (job: JobModel) => void): () => void
     }
   };
   return () => socket.close();
+}
+
+export async function cancelJob(jobId: string): Promise<void> {
+  await request(`/jobs/${jobId}`, { method: "DELETE" });
 }
