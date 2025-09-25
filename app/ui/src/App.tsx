@@ -108,7 +108,7 @@ const App: React.FC = () => {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [proxyForm, setProxyForm] = useState<ProxyFormState>(DEFAULT_PROXY_FORM);
   const [downloadSettings, setDownloadSettings] = useState<DownloadSettings | null>(null);
-  const [autoTemplate, setAutoTemplate] = useState<string>(DEFAULT_BY_ARTIST_TEMPLATE);
+  const [autoTemplate, setAutoTemplate] = useState<string>(DEFAULT_SINGLE_TEMPLATE);
   const [pathTemplateEdited, setPathTemplateEdited] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -212,12 +212,16 @@ const App: React.FC = () => {
         setHistory(historyResponse.history);
         setHistoryFiles({});
         setExpandedHistoryId(null);
+        const activeTemplate = templateForMode(
+          settingsResponse.download.mode,
+          settingsResponse.download
+        );
         setForm((prev) => ({
           ...prev,
           store: prov.stores[0] ?? prev.store,
-          pathTemplate: prev.pathTemplate || settingsResponse.download.active_template
+          pathTemplate: prev.pathTemplate || activeTemplate
         }));
-        setAutoTemplate(settingsResponse.download.active_template);
+        setAutoTemplate(activeTemplate);
         setPathTemplateEdited(false);
         setProxyForm({
           enabled: settingsResponse.proxy.enabled,
@@ -483,15 +487,23 @@ const App: React.FC = () => {
   const statusLabel = (status: string) => STATUS_STYLE[status]?.label ?? status;
   const statusColor = (status: string) => STATUS_STYLE[status]?.color ?? "#cbd5f5";
 
+  const activeDownloadMode: DownloadMode = downloadSettings?.mode ?? "single_folder";
+
   return (
     <main className="app-shell">
       <header className="app-header">
-        <div>
-          <h1>SpotiFLAC Control Center</h1>
-          <p className="muted">Управляйте загрузками, сетевыми настройками и структурой файлов из одного окна.</p>
+        <div className="header-brand">
+          <span className="brand-mark">SF</span>
+          <div>
+            <h1>SpotiFLAC Studio</h1>
+            <p className="muted">
+              Панель управления загрузками с акцентом на скорость, чистоту каталога и мгновенный контроль.
+            </p>
+          </div>
         </div>
         <div className="header-actions">
           <span className="chip">API v1</span>
+          <span className="chip chip--accent">Lossless Ready</span>
         </div>
       </header>
 
@@ -509,17 +521,17 @@ const App: React.FC = () => {
           <div className="segmented">
             <button
               type="button"
-              className={downloadSettings?.mode === "by_artist" ? "active" : ""}
+              className={activeDownloadMode === "by_artist" ? "active" : ""}
               onClick={() => handleDownloadModeChange("by_artist")}
             >
               По артистам
             </button>
             <button
               type="button"
-              className={downloadSettings?.mode === "single_folder" ? "active" : ""}
+              className={activeDownloadMode === "single_folder" ? "active" : ""}
               onClick={() => handleDownloadModeChange("single_folder")}
             >
-              В одну папку
+              Сохранение в папку
             </button>
           </div>
           <div className="template-preview">
