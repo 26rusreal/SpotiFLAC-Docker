@@ -109,6 +109,42 @@ main,
   gap: 1rem;
 }
 
+.panel--compact {
+  padding: 1.1rem 1.4rem;
+}
+
+.panel-header--compact {
+  margin-bottom: 0.75rem;
+}
+
+.proxy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.proxy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.proxy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.switch--inline {
+  gap: 0.5rem;
+}
+
+.switch--inline span {
+  font-size: 0.85rem;
+}
+
 .toggle-line {
   display: flex;
   justify-content: space-between;

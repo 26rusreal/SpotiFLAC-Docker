@@ -31,11 +31,7 @@ class StorageManager:
         if "{playlist" in template or job.mode == DownloadMode.SINGLE_FOLDER:
             context["playlist"] = playlist_name
         relative = render_path(template, context)
-        if (
-            job.mode == DownloadMode.SINGLE_FOLDER
-            and playlist_name
-            and "{playlist" not in template
-        ):
+        if playlist_name and "{playlist" not in template:
             relative = Path(sanitize_component(str(playlist_name))) / relative
         return self.download_dir / relative
 
