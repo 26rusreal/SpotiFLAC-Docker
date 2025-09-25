@@ -15,9 +15,10 @@ from app.core.models import (
     ResolvedSource,
     StoreType,
     TrackMetadata,
+    DownloadMode,
 )
 from app.core.service import DownloadService, JobRequest
-from app.infra.app_config import AppConfigRepository, ProxySettings
+from app.infra.app_config import AppConfigRepository, DownloadSettings, ProxySettings
 from app.infra.storage import StorageManager
 
 
@@ -114,6 +115,13 @@ def настройки(tmp_path: Path) -> StorageManager:
     )
 
 
+@pytest.fixture
+def anyio_backend() -> str:
+    """Используем только asyncio для тестов anyio."""
+
+    return "asyncio"
+
+
 async def дождаться_завершения(сервис: DownloadService, job_id: str) -> JobSnapshot:
     """Ожидает финального статуса задачи через подписку."""
 
@@ -131,7 +139,7 @@ async def дождаться_завершения(сервис: DownloadService,
         сервис.unsubscribe_job(job_id, очередь)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio("asyncio")
 async def test_успешная_загрузка(настройки: StorageManager) -> None:
     """Проверяет полный цикл успешной задачи."""
 
@@ -181,7 +189,7 @@ async def test_успешная_загрузка(настройки: StorageMana
         await сервис.stop()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio("asyncio")
 async def test_отмена_задачи(настройки: StorageManager) -> None:
     """Проверяет корректную обработку отмены."""
 
@@ -222,7 +230,7 @@ async def test_отмена_задачи(настройки: StorageManager) -> 
         await сервис.stop()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio("asyncio")
 async def test_ошибка_провайдера_при_пустом_списке(настройки: StorageManager) -> None:
     """Проверяет ошибку при пустом списке треков."""
 
@@ -268,9 +276,11 @@ def test_настройки_прокси(настройки: StorageManager) -> 
     по_умолчанию = сервис.get_settings()
     assert по_умолчанию["proxy"]["enabled"] is False
     assert по_умолчанию["proxy"]["host"] == ""
+    assert по_умолчанию["download"]["mode"] in {"by_artist", "single_folder"}
+    assert "active_template" in по_умолчанию["download"]
 
     обновлённые = сервис.update_settings(
-        ProxySettings(
+        proxy=ProxySettings(
             enabled=True,
             host="127.0.0.1",
             port=1088,
@@ -286,3 +296,41 @@ def test_настройки_прокси(настройки: StorageManager) -> 
         "http": "socks5h://user:pass@127.0.0.1:1088",
         "https": "socks5h://user:pass@127.0.0.1:1088",
     }
+
+
+@pytest.mark.anyio("asyncio")
+async def test_режим_одной_папки_использует_шаблон(настройки: StorageManager) -> None:
+    """Проверяет, что режим "в одну папку" подставляет корректный шаблон."""
+
+    трек = TrackMetadata(
+        title="Композиция",
+        artists="Исполнитель",
+        album="Альбом",
+        external_url="https://example.com/track",
+        isrc="TEST123",
+        track_number=1,
+    )
+    плейлист = ЗаглушкаПлейлиста([трек])
+    магазин = ФиксированныйМагазин()
+    репозиторий = AppConfigRepository(настройки.config_dir)
+    репозиторий.update_download(DownloadSettings(mode=DownloadMode.SINGLE_FOLDER))
+    сервис = DownloadService(
+        плейлист,
+        {StoreType.QOBUZ: магазин},
+        настройки,
+        config_repo=репозиторий,
+    )
+
+    await сервис.start()
+    try:
+        запрос = JobRequest(
+            provider=ProviderType.SPOTIFY,
+            store=StoreType.QOBUZ,
+            url="https://open.spotify.com/album/1",
+            quality=None,
+            path_template=None,
+        )
+        снимок = await сервис.submit_job(запрос)
+        assert снимок.path_template == "{artist} - {album} - {track:02d} - {title}.{ext}"
+    finally:
+        await сервис.stop()

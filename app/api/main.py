@@ -21,7 +21,7 @@ from app.api.schemas import (
 )
 from app.core.factory import create_service
 from app.core.service import JobRequest
-from app.infra.app_config import ProxySettings
+from app.infra.app_config import DownloadSettings, ProxySettings
 from app.infra.settings import Settings
 
 settings = Settings()
@@ -73,14 +73,28 @@ async def get_settings() -> AppSettingsModel:
 async def update_settings(payload: AppSettingsModel) -> AppSettingsModel:
     """Сохраняет настройки прокси и возвращает актуальные значения."""
 
-    proxy = ProxySettings(
-        enabled=payload.proxy.enabled,
-        host=payload.proxy.host,
-        port=payload.proxy.port or 0,
-        username=payload.proxy.username,
-        password=payload.proxy.password,
+    proxy_settings = None
+    if "proxy" in payload.model_fields_set:
+        proxy_settings = ProxySettings(
+            enabled=payload.proxy.enabled,
+            host=payload.proxy.host,
+            port=payload.proxy.port or 0,
+            username=payload.proxy.username,
+            password=payload.proxy.password,
+        )
+
+    download_settings = None
+    if "download" in payload.model_fields_set:
+        download_settings = DownloadSettings(
+            mode=payload.download.mode,
+            by_artist_template=payload.download.by_artist_template,
+            single_folder_template=payload.download.single_folder_template,
+        )
+
+    updated = service.update_settings(
+        proxy=proxy_settings,
+        download=download_settings,
     )
-    updated = service.update_settings(proxy)
     return AppSettingsModel(**updated)
 
 
@@ -110,7 +124,7 @@ async def create_job(request: JobCreateRequest) -> JobResponse:
         store=request.store,
         url=request.url,
         quality=request.quality,
-        path_template=request.path_template or settings.default_template,
+        path_template=request.path_template,
     )
     snapshot = await service.submit_job(job_request)
     return JobResponse(job=snapshot_to_model(snapshot))
