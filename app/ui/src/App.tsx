@@ -201,7 +201,6 @@ const App: React.FC = () => {
   return (
     <div className="app">
       <header className="header">
-        <h1>SpotiFLAC Control Panel</h1>
         <div className="header-controls">
           <div className="status">
             {settings && (
@@ -245,6 +244,7 @@ const App: React.FC = () => {
         {currentPage === 'main' && (
           <>
             <section className="section">
+              <h1 className="main-title">SpotiFLAC Control Panel</h1>
               <h2>Создать задачу</h2>
               <form onSubmit={createJob} className="form">
                 <div className="form-group">
@@ -409,6 +409,7 @@ const App: React.FC = () => {
 
         {currentPage === 'settings' && (
           <section className="section">
+            <h1 className="main-title">SpotiFLAC Control Panel</h1>
             <h2>Настройки прокси</h2>
             <form onSubmit={saveProxySettings} className="form">
               <div className="form-group">
