@@ -4,8 +4,7 @@ import type {
   HistoryResponse,
   JobModel,
   JobResponse,
-  JobsListResponse,
-  ProvidersResponse
+  JobsListResponse
 } from "./types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "/api";
@@ -47,10 +46,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function fetchProviders(): Promise<ProvidersResponse> {
-  return request<ProvidersResponse>("/providers");
-}
-
 export async function fetchJobs(): Promise<JobsListResponse> {
   return request<JobsListResponse>("/jobs");
 }
@@ -72,7 +67,6 @@ export async function fetchSettings(): Promise<AppSettings> {
 }
 
 export async function createJob(body: {
-  provider: string;
   store: string;
   url: string;
   quality?: string | null;
@@ -80,7 +74,10 @@ export async function createJob(body: {
 }): Promise<JobResponse> {
   return request<JobResponse>("/jobs", {
     method: "POST",
-    body: JSON.stringify(body)
+    body: JSON.stringify({
+      provider: "spotify",
+      ...body
+    })
   });
 }
 

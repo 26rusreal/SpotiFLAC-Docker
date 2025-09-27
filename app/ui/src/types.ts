@@ -1,8 +1,3 @@
-export interface ProvidersResponse {
-  playlists: string[];
-  stores: string[];
-}
-
 export interface ProxySettings {
   enabled: boolean;
   host: string;
