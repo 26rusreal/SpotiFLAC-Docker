@@ -245,6 +245,7 @@ const App: React.FC = () => {
           <>
             <div className="main-title-container">
               <h1 className="main-title">SpotiFLAC Control Panel</h1>
+              <p className="main-subtitle">Приложение для загрузки и обработки музыкальных альбомов</p>
             </div>
             <section className="section">
               <h2>Создать задачу</h2>
@@ -413,6 +414,7 @@ const App: React.FC = () => {
           <>
             <div className="main-title-container">
               <h1 className="main-title">SpotiFLAC Control Panel</h1>
+              <p className="main-subtitle">Приложение для загрузки и обработки музыкальных альбомов</p>
             </div>
             <section className="section">
               <h2>Настройки прокси</h2>
