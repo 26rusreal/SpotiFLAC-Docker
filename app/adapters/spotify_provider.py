@@ -4,9 +4,9 @@ from __future__ import annotations
 import asyncio
 from typing import Dict, List, Optional
 
-from app.core.exceptions import ProviderError
-from app.core.interfaces import PlaylistProvider
-from app.core.models import ResolvedSource, TrackMetadata
+from core.exceptions import ProviderError
+from core.interfaces import PlaylistProvider
+from core.models import ResolvedSource, TrackMetadata
 
 from .spotify import (
     SpotifyInvalidUrlException,

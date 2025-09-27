@@ -24,13 +24,13 @@ from .models import (
     TrackMetadata,
 )
 from .utils import clamp_progress
-from app.infra.app_config import (
+from infra.app_config import (
     AppConfigRepository,
     DownloadSettings,
     ProxySettings,
     get_app_config,
 )
-from app.infra.storage import StorageManager
+from infra.storage import StorageManager
 
 
 @dataclass

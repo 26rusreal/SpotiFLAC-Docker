@@ -5,9 +5,9 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from app.core.exceptions import ProviderError
-from app.core.interfaces import StoreProvider
-from app.core.models import TrackMetadata
+from core.exceptions import ProviderError
+from core.interfaces import StoreProvider
+from core.models import TrackMetadata
 
 from .amazon import LucidaDownloader
 from .deezer import DeezerDownloader

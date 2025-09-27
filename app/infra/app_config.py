@@ -7,8 +7,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, Optional
 
-from app.core.models import DownloadMode
-from app.infra.settings import Settings
+from core.models import DownloadMode
+from infra.settings import Settings
 
 DEFAULT_ARTIST_TEMPLATE = "{artist}/{album}/{track:02d} - {title}.{ext}"
 DEFAULT_SINGLE_TEMPLATE = "{artist} - {album} - {track:02d} - {title}.{ext}"

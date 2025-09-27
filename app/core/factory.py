@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from typing import Dict
 
-from app.adapters.spotify_provider import SpotifyPlaylistProvider
-from app.adapters.store_providers import STORE_REGISTRY
-from app.core.interfaces import StoreProvider
-from app.core.models import StoreType
-from app.core.service import DownloadService
-from app.infra.app_config import init_app_config
-from app.infra.settings import Settings
-from app.infra.storage import StorageManager
+from adapters.spotify_provider import SpotifyPlaylistProvider
+from adapters.store_providers import STORE_REGISTRY
+from core.interfaces import StoreProvider
+from core.models import StoreType
+from core.service import DownloadService
+from infra.app_config import init_app_config
+from infra.settings import Settings
+from infra.storage import StorageManager
 
 
 def create_service(settings: Settings) -> DownloadService:

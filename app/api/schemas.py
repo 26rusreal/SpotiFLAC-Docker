@@ -5,8 +5,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.core.models import DownloadMode, ProviderType, StoreType
-from app.infra.app_config import DEFAULT_ARTIST_TEMPLATE, DEFAULT_SINGLE_TEMPLATE
+from core.models import DownloadMode, ProviderType, StoreType
+from infra.app_config import DEFAULT_ARTIST_TEMPLATE, DEFAULT_SINGLE_TEMPLATE
 
 
 class TokenPayload(BaseModel):

@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
-from app.api.schemas import (
+from api.schemas import (
     AppSettingsModel,
     FileItem,
     FilesResponse,
@@ -21,11 +21,11 @@ from app.api.schemas import (
     ProvidersResponse,
     TokenPayload,
 )
-from app.core.factory import create_service
-from app.core.models import DownloadMode, StoreType
-from app.core.service import JobRequest
-from app.infra.app_config import DownloadSettings, ProxySettings
-from app.infra.settings import Settings
+from core.factory import create_service
+from core.models import DownloadMode, StoreType
+from core.service import JobRequest
+from infra.app_config import DownloadSettings, ProxySettings
+from infra.settings import Settings
 
 settings = Settings()
 service = create_service(settings)

@@ -1,23 +1,54 @@
-version: "3.9"
-
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: ./app/api/Dockerfile
+    image: spotiflac-api:latest
+    container_name: spotiflac-api
+    restart: unless-stopped
     environment:
       - DOWNLOAD_DIR=/downloads
       - CONFIG_DIR=/config
       - TZ=UTC
+      - PYTHONUNBUFFERED=1
     volumes:
-      - /mnt/data/data/music/Spotify Playlists:/downloads
-      - ./data/config:/config
+      - ./data:/app/data
     ports:
-      - "8082:8080"
+      - "8080:8080"
+    networks:
+      - spotiflac-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   ui:
     build: ./app/ui
+    image: spotiflac-ui:latest
+    container_name: spotiflac-ui
+    restart: unless-stopped
     environment:
       - VITE_API_BASE=/api
     ports:
       - "8083:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    networks:
+      - spotiflac-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  spotiflac-network:
+    driver: bridge
+
+volumes:
+  spotiflac-data:
+    driver: local

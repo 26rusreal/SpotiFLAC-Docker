@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.core.models import DownloadJob, DownloadMode, FileEntry, TrackMetadata
-from app.core.utils import render_path, sanitize_component
+from core.models import DownloadJob, DownloadMode, FileEntry, TrackMetadata
+from core.utils import render_path, sanitize_component
 
 
 class StorageManager:

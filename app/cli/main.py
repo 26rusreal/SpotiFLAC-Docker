@@ -9,11 +9,11 @@ from typing import Optional
 
 import typer
 
-from app.core.factory import create_service
-from app.core.models import JobStatus, ProviderType, StoreType
-from app.core.service import JobRequest
-from app.infra.settings import Settings
-from app.infra.storage import StorageManager
+from core.factory import create_service
+from core.models import JobStatus, ProviderType, StoreType
+from core.service import JobRequest
+from infra.settings import Settings
+from infra.storage import StorageManager
 
 app = typer.Typer(help="Инструмент загрузки треков из потоковых сервисов")
 

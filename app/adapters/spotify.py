@@ -8,7 +8,7 @@ import base64
 from random import randrange
 from typing import Dict, Any, List, Tuple
 
-from app.infra.app_config import get_app_config
+from infra.app_config import get_app_config
 
 # https://github.com/visagenull/Spotify-Free
 def get_random_user_agent():

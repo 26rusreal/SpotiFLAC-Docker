@@ -27,3 +27,21 @@ Thumbs.db
 .env
 .env.local
 .env.production
+
+# Test files
+test.html
+minimal-test.html
+
+# Old documentation
+RELEASE_NOTES_v2.0.0.md
+
+# Image files (not needed in repo)
+*.png
+*.svg
+*.ico
+*.jpg
+*.jpeg
+*.gif
+
+# Version files
+version.json
