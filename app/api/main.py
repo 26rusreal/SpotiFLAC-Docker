@@ -22,6 +22,7 @@ from app.api.schemas import (
     TokenPayload,
 )
 from app.core.factory import create_service
+from app.core.models import DownloadMode, StoreType
 from app.core.service import JobRequest
 from app.infra.app_config import DownloadSettings, ProxySettings
 from app.infra.settings import Settings
@@ -121,12 +122,21 @@ async def save_tokens(provider: str, payload: TokenPayload) -> Dict[str, str]:
 
 @app.post("/jobs", response_model=JobResponse)
 async def create_job(request: JobCreateRequest) -> JobResponse:
+    # Всегда переключаем API на режим "одна папка" и берём шаблон из настроек.
+    download_settings = service.config_repo.load().download
+    if download_settings.mode != DownloadMode.SINGLE_FOLDER:
+        service.update_settings(
+            download=download_settings.with_mode(DownloadMode.SINGLE_FOLDER)
+        )
+        download_settings = service.config_repo.load().download
+    path_template = download_settings.single_folder_template
+
     job_request = JobRequest(
         provider=request.provider,
-        store=request.store,
+        store=StoreType.DEEZER,  # Принудительно используем Deezer для загрузок через API.
         url=request.url,
         quality=request.quality,
-        path_template=request.path_template,
+        path_template=path_template,
     )
     snapshot = await service.submit_job(job_request)
     return JobResponse(job=snapshot_to_model(snapshot))
