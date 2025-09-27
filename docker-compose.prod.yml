@@ -5,7 +5,7 @@ services:
     build:
       context: ./app/api
       dockerfile: Dockerfile
-    image: ghcr.io/26rusreal/spotiflac-api:v2.1.0
+    image: 26rusreal/spotiflac-api:v2.1.0
     container_name: spotiflac-api
     restart: unless-stopped
     ports:
@@ -27,7 +27,7 @@ services:
     build:
       context: ./app/ui
       dockerfile: Dockerfile
-    image: ghcr.io/26rusreal/spotiflac-ui:v2.1.0
+    image: 26rusreal/spotiflac-ui:v2.1.0
     container_name: spotiflac-ui
     restart: unless-stopped
     ports:

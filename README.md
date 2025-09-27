@@ -122,9 +122,9 @@ docker compose logs -f
 
 ## 📦 Docker образы
 
-### GitHub Container Registry
-- `ghcr.io/26rusreal/spotiflac-ui:v2.1.0` - UI с красивым дизайном
-- `ghcr.io/26rusreal/spotiflac-api:v2.1.0` - API сервер
+### Docker Hub
+- `26rusreal/spotiflac-ui:v2.1.0` - UI с красивым дизайном
+- `26rusreal/spotiflac-api:v2.1.0` - API сервер
 
 ### Размеры
 - UI: ~53MB (оптимизированный)
@@ -132,8 +132,17 @@ docker compose logs -f
 
 ### Production развертывание
 ```bash
-# Использование готовых образов из GitHub Container Registry
+# Использование готовых образов из Docker Hub
 docker compose -f docker-compose.prod.yml up -d
+```
+
+### Отправка образов
+```bash
+# Войти в Docker Hub
+docker login
+
+# Отправить образы
+./push-to-dockerhub.sh
 ```
 
 ## Тесты и качество
