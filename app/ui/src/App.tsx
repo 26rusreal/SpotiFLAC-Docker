@@ -60,11 +60,6 @@ const App: React.FC = () => {
   // Загрузка данных
   useEffect(() => {
     loadData();
-    
-    // Автоматическое обновление каждые 5 секунд
-    const interval = setInterval(loadData, 5000);
-    
-    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -385,7 +380,7 @@ const App: React.FC = () => {
                         </div>
                         {job.status === "completed" && (
                           <div className="tracks-count-compact">
-                            {job.completed_tracks} треков
+                            {job.completed_tracks} / {job.total_tracks} треков
                           </div>
                         )}
                         {job.status === "failed" && (
