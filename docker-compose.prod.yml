@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./app/api
+      dockerfile: Dockerfile
+    image: spotiflac-api:v2.1.0
+    container_name: spotiflac-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+    networks:
+      - spotiflac-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  ui:
+    build:
+      context: ./app/ui
+      dockerfile: Dockerfile
+    image: spotiflac-ui:v2.1.0
+    container_name: spotiflac-ui
+    restart: unless-stopped
+    ports:
+      - "8083:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - spotiflac-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  spotiflac-network:
+    driver: bridge
+
+volumes:
+  spotiflac-data:
+    driver: local
