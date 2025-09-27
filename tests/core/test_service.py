@@ -278,7 +278,7 @@ def test_настройки_прокси(настройки: StorageManager) -> 
     по_умолчанию = сервис.get_settings()
     assert по_умолчанию["proxy"]["enabled"] is False
     assert по_умолчанию["proxy"]["host"] == ""
-    assert по_умолчанию["download"]["mode"] in {"by_artist", "single_folder"}
+    assert по_умолчанию["download"]["mode"] == "single_folder"
     assert "active_template" in по_умолчанию["download"]
 
     обновлённые = сервис.update_settings(
@@ -333,7 +333,10 @@ async def test_режим_одной_папки_использует_шабло�
             path_template=None,
         )
         снимок = await сервис.submit_job(запрос)
-        assert снимок.path_template == "{playlist}/{track:02d} - {artist} - {title}.{ext}"
+        assert (
+            снимок.path_template
+            == "{artist} - {album} - {track:02d} - {title}.{ext}"
+        )
     finally:
         await сервис.stop()
 

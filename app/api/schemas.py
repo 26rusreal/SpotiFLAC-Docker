@@ -103,11 +103,11 @@ class ProxySettingsModel(BaseModel):
 
 class DownloadSettingsModel(BaseModel):
     mode: DownloadMode = Field(
-        default=DownloadMode.BY_ARTIST,
+        default=DownloadMode.SINGLE_FOLDER,
         description="Режим построения структуры каталогов",
     )
     active_template: str = Field(
-        default=DEFAULT_ARTIST_TEMPLATE,
+        default=DEFAULT_SINGLE_TEMPLATE,
         description="Текущий шаблон с учётом выбранного режима",
     )
     by_artist_template: str = Field(

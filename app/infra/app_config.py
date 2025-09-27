@@ -11,7 +11,7 @@ from app.core.models import DownloadMode
 from app.infra.settings import Settings
 
 DEFAULT_ARTIST_TEMPLATE = "{artist}/{album}/{track:02d} - {title}.{ext}"
-DEFAULT_SINGLE_TEMPLATE = "{playlist}/{track:02d} - {artist} - {title}.{ext}"
+DEFAULT_SINGLE_TEMPLATE = "{artist} - {album} - {track:02d} - {title}.{ext}"
 
 
 @dataclass
@@ -259,7 +259,7 @@ def init_app_config(config_dir: Path, *, settings: Optional[Settings] = None) ->
     defaults = AppSettings(
         proxy=ProxySettings(),
         download=DownloadSettings(
-            mode=DownloadMode.BY_ARTIST,
+            mode=DownloadMode.SINGLE_FOLDER,
             by_artist_template=base_settings.default_template or DEFAULT_ARTIST_TEMPLATE,
             single_folder_template=getattr(base_settings, "flat_template", DEFAULT_SINGLE_TEMPLATE) or DEFAULT_SINGLE_TEMPLATE,
         ),
