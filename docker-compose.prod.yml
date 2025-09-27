@@ -5,7 +5,7 @@ services:
     build:
       context: ./app/api
       dockerfile: Dockerfile
-    image: spotiflac-api:v2.1.0
+    image: ghcr.io/26rusreal/spotiflac-api:v2.1.0
     container_name: spotiflac-api
     restart: unless-stopped
     ports:
@@ -17,7 +17,7 @@ services:
     networks:
       - spotiflac-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -27,7 +27,7 @@ services:
     build:
       context: ./app/ui
       dockerfile: Dockerfile
-    image: spotiflac-ui:v2.1.0
+    image: ghcr.io/26rusreal/spotiflac-ui:v2.1.0
     container_name: spotiflac-ui
     restart: unless-stopped
     ports:
