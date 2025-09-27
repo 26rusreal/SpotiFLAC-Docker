@@ -173,8 +173,8 @@ body {
 
 /* Error message */
 .error {
-  background: #7f1d1d;
-  border: 1px solid #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 0.5rem;
   padding: 1rem;
   margin-bottom: 2rem;
@@ -184,7 +184,7 @@ body {
 }
 
 .error p {
-  color: #fca5a5;
+  color: #dc2626;
   margin: 0;
 }
 
@@ -203,26 +203,26 @@ body {
 
 .form-group label {
   font-weight: 500;
-  color: #e2e8f0;
+  color: #374151;
   font-size: 0.875rem;
 }
 
 .form-group input,
 .form-group select {
-  background: #0f172a;
-  border: 1px solid #475569;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 0.375rem;
   padding: 0.75rem;
-  color: #f1f5f9;
+  color: #1e293b;
   font-size: 0.875rem;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #8A2BE2;
+  box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.1);
 }
 
 /* Buttons */
@@ -365,17 +365,17 @@ body {
 }
 
 .error-compact {
-  color: #ef4444;
+  color: #dc2626;
   font-size: 0.75rem;
   font-weight: 500;
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(220, 38, 38, 0.1);
   padding: 0.125rem 0.5rem;
   border-radius: 0.25rem;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(220, 38, 38, 0.2);
 }
 
 .btn-cancel-compact {
-  background: #ef4444;
+  background: #dc2626;
   color: white;
   border: none;
   border-radius: 0.25rem;
@@ -391,7 +391,7 @@ body {
 }
 
 .btn-cancel-compact:hover {
-  background: #dc2626;
+  background: #b91c1c;
 }
 
 .job-info {
@@ -493,7 +493,7 @@ body {
 .progress {
   width: 100%;
   height: 6px;
-  background: #334155;
+  background: #e5e7eb;
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 0.375rem;
@@ -559,36 +559,36 @@ body {
 
 /* Completed info */
 .job-completed-info {
-  background: rgba(16, 185, 129, 0.05);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 0.375rem;
   padding: 0.75rem;
   margin-top: 0.5rem;
 }
 
 .completion-stats {
-  color: #e2e8f0;
+  color: #374151;
   font-size: 0.875rem;
   margin-bottom: 0.25rem;
   font-weight: 500;
 }
 
 .completion-time {
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 0.75rem;
 }
 
 /* Error info */
 .job-error-info {
-  background: rgba(239, 68, 68, 0.05);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(220, 38, 38, 0.2);
   border-radius: 0.375rem;
   padding: 0.75rem;
   margin-top: 0.5rem;
 }
 
 .error-message {
-  color: #fca5a5;
+  color: #dc2626;
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -674,7 +674,10 @@ body {
 .empty {
   text-align: center;
   padding: 3rem 1rem;
-  color: #94a3b8;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
 }
 
 .empty p {
@@ -780,15 +783,18 @@ body {
   
   .main {
     padding: 1rem;
+    background: #ffffff;
   }
   
   .section {
     padding: 1rem;
+    background: #ffffff;
   }
   
   .job-card {
     flex-direction: column;
     align-items: stretch;
+    background: #ffffff;
   }
   
   .job-status {
